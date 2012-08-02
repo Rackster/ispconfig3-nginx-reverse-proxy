@@ -91,7 +91,9 @@ class nginx_reverse_proxy_plugin {
 		 */
 		$data['cert']['crt'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.crt');
 		$data['cert']['key'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.key');
-		$data['cert']['bundle'] = escapeshellcmd($ssl_dir .'/'. $data['old']['ssl_domain'] .'.bundle');
+		$data['cert']['bundle'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.bundle');
+		$data['cert'][$suffix .'_crt'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.'. $suffix .'.crt');
+		$data['cert'][$suffix .'_key'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.'. $suffix .'.key');
 
 
 		/*
@@ -99,6 +101,7 @@ class nginx_reverse_proxy_plugin {
 		 * (or the path you defined) and set to '1' if it does
 		 */
 		if (is_file($data['cert']['crt'])) $data['cert']['crt_check'] = 1;
+		if (is_file($data['cert'][$suffix .'_crt'])) $data['cert'][$suffix .'_crt_check'] = 1;
 
 
 		/*
@@ -106,6 +109,7 @@ class nginx_reverse_proxy_plugin {
 		 * (or the path you defined) and set to '1' if it does
 		 */
 		if (is_file($data['cert']['key'])) $data['cert']['key_check'] = 1;
+		if (is_file($data['cert'][$suffix .'_key'])) $data['cert'][$suffix .'_key_check'] = 1;
 
 
 		/*
@@ -177,6 +181,19 @@ class nginx_reverse_proxy_plugin {
 	 */
 	function ssl($event_name, $data) {
 		global $app, $conf;
+
+		/*
+		 * check if we have to delete the ssl files
+		 */
+		if ($data['new']['ssl_action'] == 'delete') {
+
+			$this->cert('delete', $data);
+
+		} else {
+
+			$this->cert('update', $data);
+
+		}
 
 	}
 
@@ -297,6 +314,9 @@ class nginx_reverse_proxy_plugin {
 
 
 
+
+
+
 			/*
 			 * Non-SSL vhost
 			 */
@@ -319,8 +339,15 @@ class nginx_reverse_proxy_plugin {
 
 			$tpl->setLoop('vhosts', $vhosts);
 
-			$tpl->setVar('cp_base_url', 'https://cp.rackster.ch:8080');
 			$tpl->setVar($vhost_data);
+
+
+
+
+
+
+
+
 
 
 			/*
@@ -408,6 +435,8 @@ class nginx_reverse_proxy_plugin {
 	 */
 	function client_delete($event_name, $data) {
 		global $app, $conf;
+
+		// delete all vhosts from client
 
 	}
 

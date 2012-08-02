@@ -14,7 +14,7 @@ class vhost {
 			 */
 			exec('touch '. $data['vhost']['file_new']);
 			$data['vhost']['file_new_check'] = 1;
-			$app->log('Creating nginx-rp vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
+			$app->log('Creating vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
 
 		}
 
@@ -25,7 +25,7 @@ class vhost {
 			 */
 			exec('ln -s '. $data['vhost']['file_new'] .' '. $data['vhost']['link_new']);
 			$data['vhost']['link_new_check'] = 1;
-			$app->log('Creating nginx-rp vhost symlink: '. $data['vhost']['link_new_check'], LOGLEVEL_DEBUG);
+			$app->log('Creating vhost symlink: '. $data['vhost']['link_new_check'], LOGLEVEL_DEBUG);
 
 		}
 
@@ -34,7 +34,7 @@ class vhost {
 		 * Write the template content
 		 */
 		file_put_contents($data['vhost']['file_new'], $tpl);
-		$app->log('Writing the nginx-rp vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
+		$app->log('Writing the vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
 		unset($tpl);
 
 
@@ -94,7 +94,7 @@ class vhost {
 			 */
 			unlink($data['vhost']['file_old']);
 			$data['vhost']['file_old_check'] = 0;
-			$app->log('Removing nginx-rp vhost file: '. $data['vhost']['file_old'], LOGLEVEL_DEBUG);
+			$app->log('Removing vhost file: '. $data['vhost']['file_old'], LOGLEVEL_DEBUG);
 
 		}
 
@@ -105,7 +105,7 @@ class vhost {
 			 */
 			unlink($data['vhost']['link_old']);
 			$data['vhost']['link_old_check'] = 0;
-			$app->log('Removing nginx-rp vhost symlink: '. $data['vhost']['link_old'], LOGLEVEL_DEBUG);
+			$app->log('Removing vhost symlink: '. $data['vhost']['link_old'], LOGLEVEL_DEBUG);
 
 		}
 
