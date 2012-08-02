@@ -1,0 +1,127 @@
+<tmpl_loop name="vhosts">
+server {
+
+	######################################################################
+	## Server configuration
+	######################################################################
+
+	# Tell nginx to listen on port <tmpl_var name='port'> (default http(s) port)
+	listen <tmpl_var name='ip_address'>:<tmpl_var name='port'>;
+
+	server_name <tmpl_var name='domain'> <tmpl_if name='alias'><tmpl_var name='alias'></tmpl_if> <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'></tmpl_if>;
+
+	######################################################################
+	## Log configuration
+	######################################################################
+
+	access_log /var/log/ispconfig/httpd/<tmpl_var name='domain'>/access.log combined;
+	error_log /var/log/ispconfig/httpd/<tmpl_var name='domain'>/error.log;
+
+	<tmpl_if name='ssl_enabled'>
+	######################################################################
+	## SSL configuration
+	######################################################################
+
+	ssl on;
+	ssl_certificate <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>_nginx.crt;
+	ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>_nginx.key;
+	</tmpl_if>
+
+	######################################################################
+	## Redirects configuration
+	######################################################################
+
+	<tmpl_if name='seo_redirect_enabled'>
+	# SEO Redirect
+	if ($http_host = "<tmpl_var name='seo_redirect_origin_domain'>") {
+		rewrite ^ $scheme://<tmpl_var name='seo_redirect_target_domain'>$request_uri permanent;
+	}
+	</tmpl_if>
+
+	<tmpl_if name='rewrite_enabled'>
+		<tmpl_loop name="redirects">
+		# Redirects
+		if ($http_host ~* "<tmpl_var name='rewrite_domain'>$") {
+			rewrite ^/(.+)$ <tmpl_var name='rewrite_target'>$1 <tmpl_var name='rewrite_type'>;
+		}
+		</tmpl_loop>
+	</tmpl_if>
+
+	######################################################################
+	## Error configuration
+	######################################################################
+
+	error_page 400 /error/400.html;
+	error_page 401 /error/401.html;
+	error_page 403 /error/403.html;
+	error_page 404 /error/404.html;
+	error_page 405 /error/405.html;
+	error_page 500 /error/500.html;
+	error_page 502 /error/502.html;
+	error_page 503 /error/503.html;
+
+	######################################################################
+	## Locations configuration
+	######################################################################
+
+	location / {
+
+		# Resolve the proxy_pass address
+		resolver 5.9.245.243;
+
+		# disable access log (we already have it for nginx)
+		access_log off;
+
+		# set the document root
+		root <tmpl_var name='web_document_root_www'>;
+
+		# cache apache2's answers in the cache
+		proxy_cache nginx_cache;
+
+		# pass all requests to apache2
+		proxy_pass http://<tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'><tmpl_else><tmpl_var name='domain'></tmpl_if>:<tmpl_var name='apache2_port'>;
+
+	}
+
+	location ~ /\. {
+
+		# Don't allow any access
+		deny all;
+
+		# Don't log access
+		access_log off;
+
+		# Don't log 404 not found
+		log_not_found off;
+
+	}
+
+	location /subdomains {
+
+		# Don't allow any access
+		deny all;
+
+		# Don't log access
+		access_log off;
+
+		# Don't log 404 not found
+		log_not_found off;
+
+	}
+
+	######################################################################
+	## CP configuration
+	######################################################################
+
+	# If domain.tld/ispconfig is requested, redirect to the secure ISPConfig URL
+	location = /ispconfig { rewrite ^ <tmpl_var name='cp_base_url'>/ permanent; }
+
+	# If domain.tld/phpmyadmin is requested, redirect to the secure phpMyAdmin URL
+	location = /phpmyadmin { rewrite ^ <tmpl_var name='cp_base_url'>/phpmyadmin/ permanent;	}
+
+	# If domain.tld/webmail is requested, redirect to the secure RoundCube Webmail URL
+	location = /webmail {	rewrite ^ <tmpl_var name='cp_base_url'>/webmail/ permanent;	}
+
+}
+
+</tmpl_loop>
