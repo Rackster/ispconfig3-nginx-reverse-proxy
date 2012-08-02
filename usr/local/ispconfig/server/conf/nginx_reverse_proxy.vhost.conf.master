@@ -23,8 +23,8 @@ server {
 	######################################################################
 
 	ssl on;
-	ssl_certificate <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>_nginx.crt;
-	ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>_nginx.key;
+	ssl_certificate <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.crt;
+	ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.key;
 	</tmpl_if>
 
 	######################################################################
@@ -79,7 +79,11 @@ server {
 		proxy_cache nginx_cache;
 
 		# pass all requests to apache2
-		proxy_pass http://<tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'><tmpl_else><tmpl_var name='domain'></tmpl_if>:<tmpl_var name='apache2_port'>;
+		<tmpl_if name='seo_redirect_enabled'>
+			proxy_pass http://<tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'><tmpl_else><tmpl_var name='seo_redirect_target_domain'></tmpl_if>:<tmpl_var name='apache2_port'>;
+		<tmpl_else>
+			proxy_pass http://<tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'><tmpl_else><tmpl_var name='domain'></tmpl_if>:<tmpl_var name='apache2_port'>;
+		</tmpl_if>
 
 	}
 

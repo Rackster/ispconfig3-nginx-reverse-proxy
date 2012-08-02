@@ -313,12 +313,8 @@ class nginx_reverse_proxy_plugin {
 			}
 
 
-
-
-
-
 			/*
-			 * Non-SSL vhost
+			 * Put the default non-SSL vhost into the loop array
 			 */
 			$vhosts[] = array(
 				'ip_address' => $data['new']['ip_address'],
@@ -327,27 +323,41 @@ class nginx_reverse_proxy_plugin {
 				'apache2_port' => 82
 			);
 
-			/*
-			 * SSL vhost
-			 */
-			$vhosts[] = array(
-				'ip_address' => $data['new']['ip_address'],
-				'ssl_enabled' => 1,
-				'port' => 443,
-				'apache2_port' => 445
-			);
 
+			/*
+			 * Check if the site is SSL enabled
+			 */
+			if ($data['new']['ssl'] == 'y') {
+
+				$vhost_data['web_document_root_ssl'] = $data['new']['document_root'] .'/ssl';
+
+
+				/*
+				 * add the SSL vhost to the loop
+				 */
+				$vhosts[] = array(
+					'ip_address' => $data['new']['ip_address'],
+					'ssl_enabled' => 1,
+					'port' => 443,
+					'apache2_port' => 445
+				);
+
+			}
+
+
+			/*
+			 * Our vhost loop should now be ready,
+			 * so we set it
+			 */
 			$tpl->setLoop('vhosts', $vhosts);
 
+
+			/*
+			 * We have collected all data in the $vhost_data array
+			 * so we can pass it to the template engine
+			 */
+			$tpl->setVar('cp_base_url', 'https://cp.rackster.ch:8080');
 			$tpl->setVar($vhost_data);
-
-
-
-
-
-
-
-
 
 
 			/*
