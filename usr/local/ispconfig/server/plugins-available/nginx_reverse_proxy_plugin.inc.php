@@ -327,7 +327,9 @@ class nginx_reverse_proxy_plugin {
 			/*
 			 * Check if the site is SSL enabled
 			 */
-			if ($data['new']['ssl'] == 'y') {
+			$crt_file = escapeshellcmd($data['new']['document_root'] .'/ssl/'. $data['new']['ssl_domain'] .'.crt');
+			$key_file = escapeshellcmd($data['new']['document_root'] .'/ssl/'. $data['new']['ssl_domain'] .'.key');
+			if ($data['new']['ssl_domain'] != '' && $data['new']['ssl'] == 'y' && is_file($crt_file) && is_file($key_file) && (filesize($crt_file) > 0) && (filesize($key_file) > 0)) {
 
 				$vhost_data['web_document_root_ssl'] = $data['new']['document_root'] .'/ssl';
 
@@ -339,7 +341,7 @@ class nginx_reverse_proxy_plugin {
 					'ip_address' => $data['new']['ip_address'],
 					'ssl_enabled' => 1,
 					'port' => 443,
-					'apache2_port' => 445
+					'apache2_port' => 82
 				);
 
 			}
