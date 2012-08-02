@@ -307,10 +307,7 @@ class nginx_reverse_proxy_plugin {
 			 */
 			$alias_result = array();
 
-			$alias_result = $app->dbmaster->queryOneRecord('SELECT domain, subdomain FROM web_domain WHERE parent_domain_id = '. $data['new']['parent_domain_id'] .' AND parent_domain_id > 0 AND active = "y"');
-
-			exec('echo "'. print_r($alias_result, true) .'" > /tmp/result.txt');
-			exec('echo "'. print_r($data, true) .'" > /tmp/data.txt');
+			$alias_result = $app->dbmaster->queryAllRecords('SELECT domain, subdomain FROM web_domain WHERE parent_domain_id = '. $data['new']['parent_domain_id'] .' AND parent_domain_id > 0 AND active = "y"');
 
 			if (count($alias_result) > 0) {
 
