@@ -16,15 +16,15 @@ class cert {
 			 * merge the .crt and .bundle files
 			 */
 			exec('cat '. $data['cert']['crt'] .' '. $data['cert']['bundle'] .' > '. $data['cert'][$suffix .'_crt']);
-			$app->log('Merging ssl cert and bundle file: '. $data['cert'][$suffix .'crt'], LOGLEVEL_DEBUG);
+			$app->log('Merging ssl cert and bundle file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
 
 		} else {
 
 			/*
 			 * copy the secrect .crt file
 			 */
-			exec('cp '. $data['cert']['crt'] .' '. $data['cert'][$suffix .'crt']);
-			$app->log('Copying ssl cert file: '. $data['cert'][$suffix .'crt'], LOGLEVEL_DEBUG);
+			exec('cp '. $data['cert']['crt'] .' '. $data['cert'][$suffix .'_crt']);
+			$app->log('Copying ssl cert file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
 
 		}
 
