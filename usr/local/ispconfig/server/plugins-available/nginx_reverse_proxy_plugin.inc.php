@@ -300,6 +300,7 @@ class nginx_reverse_proxy_plugin {
 
 			}
 
+
 			/*
 			 * Check if the above function and checks 'returned' an alias domain
 			 * so we know if we have to pass something to the 'vhost' master
@@ -318,6 +319,105 @@ class nginx_reverse_proxy_plugin {
 			} else {
 
 				$tpl->setVar('alias', '');
+
+			}
+
+
+			/*
+			 * Rewrite rule support for main domain (site)
+			 */
+			$rewrite_rules = array();
+
+			if($data['new']['redirect_type'] != '' && $data['new']['redirect_path'] != '') {
+
+				if(substr($data['new']['redirect_path'], -1) != '/') $data['new']['redirect_path'] .= '/';
+				if(substr($data['new']['redirect_path'], 0, 8) == '[scheme]') {
+
+					$rewrite_target = 'http'.substr($data['new']['redirect_path'], 8);
+					$rewrite_target_ssl = 'https'.substr($data['new']['redirect_path'], 8);
+
+				} else {
+
+					$rewrite_target = $data['new']['redirect_path'];
+					$rewrite_target_ssl = $data['new']['redirect_path'];
+
+				}
+
+
+				/*
+				 * We have to check where the redirect points
+				 * e.g. if it is to an external URL
+				 */
+				if (substr($data['new']['redirect_path'], 0, 4) == 'http') {
+
+					/*
+					 * Always redirect permanent (e.g. R=301,L)
+					 */
+					$data['new']['redirect_type'] = 'permanent';
+
+				} else {
+
+					/*
+					 * We need to prepare the rewrite types since nginx
+					 * uses other ones than apache2
+					 */
+					switch($data['new']['redirect_type']) {
+
+						/*case 'no':
+							$data['new']['redirect_type'] = 'break';
+							break;
+
+						case 'L':
+							$data['new']['redirect_type'] = 'break';
+							break;
+
+						default:
+							$data['new']['redirect_type'] = 'permanent';
+							break;*/
+
+					}
+
+				}
+
+
+				/*
+				 * Now we are ready to put them into an array
+				 */
+				switch($data['new']['subdomain']) {
+
+					case 'www':
+						$rewrite_rules[] = array(
+							'rewrite_domain' => '^'.$data['new']['domain'],
+							'rewrite_type' => ($data['new']['redirect_type'] == 'no') ? '' : $data['new']['redirect_type'],
+							'rewrite_target' => $rewrite_target,
+							'rewrite_target_ssl' => $rewrite_target_ssl
+						);
+						$rewrite_rules[] = array(
+							'rewrite_domain' => '^www.'.$data['new']['domain'],
+							'rewrite_type' => ($data['new']['redirect_type'] == 'no') ? '' : $data['new']['redirect_type'],
+							'rewrite_target' => $rewrite_target,
+							'rewrite_target_ssl' => $rewrite_target_ssl
+						);
+						break;
+
+					case '*':
+						$rewrite_rules[] = array(
+							'rewrite_domain' => '(^|\.)'.$data['new']['domain'],
+							'rewrite_type' => ($data['new']['redirect_type'] == 'no') ? '' : $data['new']['redirect_type'],
+							'rewrite_target' => $rewrite_target,
+							'rewrite_target_ssl' => $rewrite_target_ssl
+						);
+						break;
+
+					default:
+						$rewrite_rules[] = array(
+							'rewrite_domain' => '^'.$data['new']['domain'],
+							'rewrite_type' => ($data['new']['redirect_type'] == 'no') ? '' : $data['new']['redirect_type'],
+							'rewrite_target' => $rewrite_target,
+							'rewrite_target_ssl' => $rewrite_target_ssl
+						);
+
+				}
 
 			}
 
@@ -361,13 +461,31 @@ class nginx_reverse_proxy_plugin {
 			/*
 			 * Put the default non-SSL vhost into the loop array
 			 */
-			$vhosts[] = array(
-				'ip_address' => $data['new']['ip_address'],
-				'ipv6_address' => $data['new']['ipv6_address'],
-				'ssl_enabled' => 0,
-				'port' => 80,
-				'apache2_port' => 82
-			);
+			if (count($rewrite_rules) > 0) {
+
+				$vhosts[] = array(
+					'ip_address' => $data['new']['ip_address'],
+					'ipv6_address' => $data['new']['ipv6_address'],
+					'ssl_enabled' => 0,
+					'rewrite_enabled' => 1,
+					'redirects' => $rewrite_rules,
+					'port' => 80,
+					'apache2_port' => 82
+				);
+
+			} else {
+
+				$vhosts[] = array(
+					'ip_address' => $data['new']['ip_address'],
+					'ipv6_address' => $data['new']['ipv6_address'],
+					'ssl_enabled' => 0,
+					'rewrite_enabled' => 0,
+					'redirects' => '',
+					'port' => 80,
+					'apache2_port' => 82
+				);
+
+			}
 
 
 			/*
@@ -383,13 +501,31 @@ class nginx_reverse_proxy_plugin {
 				/*
 				 * add the SSL vhost to the loop
 				 */
-				$vhosts[] = array(
-					'ip_address' => $data['new']['ip_address'],
-					'ipv6_address' => $data['new']['ipv6_address'],
-					'ssl_enabled' => 1,
-					'port' => 443,
-					'apache2_port' => 82
-				);
+				if (count($rewrite_rules) > 0) {
+
+					$vhosts[] = array(
+						'ip_address' => $data['new']['ip_address'],
+						'ipv6_address' => $data['new']['ipv6_address'],
+						'ssl_enabled' => 0,
+						'rewrite_enabled' => 1,
+						'redirects' => $rewrite_rules,
+						'port' => 443,
+						'apache2_port' => 82
+					);
+
+				} else {
+
+					$vhosts[] = array(
+						'ip_address' => $data['new']['ip_address'],
+						'ipv6_address' => $data['new']['ipv6_address'],
+						'ssl_enabled' => 0,
+						'rewrite_enabled' => 0,
+						'redirects' => '',
+						'port' => 443,
+						'apache2_port' => 82
+					);
+
+				}
 
 			}
 
