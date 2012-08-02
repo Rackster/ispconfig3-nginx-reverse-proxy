@@ -185,7 +185,7 @@ class nginx_reverse_proxy_plugin {
 		/*
 		 * check if we have to delete the ssl files
 		 */
-		if ($data['new']['ssl_action'] == 'delete') {
+		if ($data['new']['ssl_action'] == 'del') {
 
 			$this->cert('delete', $data);
 
