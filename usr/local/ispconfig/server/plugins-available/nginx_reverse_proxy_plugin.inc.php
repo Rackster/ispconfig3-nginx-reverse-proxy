@@ -286,7 +286,7 @@ class nginx_reverse_proxy_plugin {
 			/*
 			 * Auto-Subdomain handling
 			 */
-			$server_alias = array();
+			if (!isset($server_alias)) $server_alias = array();
 
 			switch($data['new']['subdomain']) {
 
@@ -299,6 +299,43 @@ class nginx_reverse_proxy_plugin {
 					break;
 
 			}
+
+
+			/*
+			 * Check the DB if there are other alias domains
+			 * and save to $alias_domains
+			 */
+			/*$alias_domains = $app->dbmaster->queryOneRecord('SELECT * FROM web_domain WHERE parent_domain_id = '. $data['new']['parent_domain_id'] .' AND parent_domain_id > 0 AND active = "y"');
+
+			exec('echo "' . print_r($alias_domains, true) .'" > /tmp/query.txt');
+
+			if (count($alias_domains) > 0) {
+
+				foreach($alias_domains as $alias) {
+
+					switch($alias['subdomain']) {
+
+						case 'www':
+							$server_alias[] .= 'www.'. $alias['domain'] .' '. $alias['domain'] .' ';
+							break;
+
+						case '*':
+							$server_alias[] .= '*.'. $alias['domain'] .' '. $alias['domain'] .' ';
+							break;
+
+						default:
+							$server_alias[] .= $alias['domain'] .' ';
+							break;
+
+					}
+
+					unset($alias);
+
+					$app->log('Add server alias: '. $alias['domain'], LOGLEVEL_DEBUG);
+
+				}
+
+			}*/
 
 
 			/*
@@ -326,7 +363,7 @@ class nginx_reverse_proxy_plugin {
 			/*
 			 * Rewrite rule support for main domain (site)
 			 */
-			$rewrite_rules = array();
+			if (!isset($rewrite_rules)) $rewrite_rules = array();
 
 			if($data['new']['redirect_type'] != '' && $data['new']['redirect_path'] != '') {
 
@@ -363,7 +400,7 @@ class nginx_reverse_proxy_plugin {
 					 */
 					switch($data['new']['redirect_type']) {
 
-						/*case 'no':
+						case 'no':
 							$data['new']['redirect_type'] = 'break';
 							break;
 
@@ -373,7 +410,7 @@ class nginx_reverse_proxy_plugin {
 
 						default:
 							$data['new']['redirect_type'] = 'permanent';
-							break;*/
+							break;
 
 					}
 
@@ -572,7 +609,24 @@ class nginx_reverse_proxy_plugin {
 		 * for sites, aliases and subdomains
 		 * -> alias
 		 */
-		if($data['new']['type'] == 'alias') {}
+		if($data['new']['type'] == 'alias') {
+
+			/*
+			 * We will run the update function based on the parent_domain so we
+			 * first have to get it
+			 */
+			//$parent_domain = $app->dbmaster->queryOneRecord('SELECT * FROM web_domain WHERE parent_domain_id = '. $data['new']['parent_domain_id'] .'');
+
+
+			/*
+			 * Set data to $parent_domain but override the parent_domain_id
+			 */
+			//$parent_domain['parent_domain_id'] = $data['new']['parent_domain_id'];
+			//$data['new'] = $parent_domain;
+
+			//$this->update($event_name, $data);
+
+		}
 
 
 		/*

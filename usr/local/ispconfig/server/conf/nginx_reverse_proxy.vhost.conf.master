@@ -46,9 +46,9 @@ server {
 	<tmpl_if name='rewrite_enabled'>
 		<tmpl_loop name="redirects">
 		# Redirects
-		if ($http_host ~* "<tmpl_var name='rewrite_domain'>$") {
-			rewrite ^/(.+)$ <tmpl_var name='rewrite_target'>$1 <tmpl_var name='rewrite_type'>;
-		}
+		#if ($http_host ~* "<tmpl_var name='rewrite_domain'>$") {
+		#	rewrite ^/(.+)$ <tmpl_var name='rewrite_target'>$1 <tmpl_var name='rewrite_type'>;
+		#}
 		</tmpl_loop>
 	</tmpl_if>
 
