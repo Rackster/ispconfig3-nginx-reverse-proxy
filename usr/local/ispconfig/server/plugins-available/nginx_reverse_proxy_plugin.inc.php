@@ -635,7 +635,25 @@ class nginx_reverse_proxy_plugin {
 		 * for sites, aliases and subdomains
 		 * -> subdomain
 		 */
-		if($data['new']['type'] == 'subdomain') {}
+		if($data['new']['type'] == 'subdomain') {
+
+			/*
+			 * We will run the update function based on the parent_domain so we
+			 * first have to get it
+			 */
+			$parent_domain = $app->dbmaster->queryOneRecord('SELECT * FROM web_domain WHERE domain_id = '. intval($data['new']['parent_domain_id']) .'');
+
+
+			/*
+			 * Set data to $parent_domain but override the parent_domain_id
+			 */
+			$parent_domain['parent_domain_id'] = $data['new']['parent_domain_id'];
+			$data['old'] = $parent_domain;
+			$data['new'] = $parent_domain;
+
+			$this->update($event_name, $data);
+
+		}
 
 
 		/*
@@ -684,7 +702,26 @@ class nginx_reverse_proxy_plugin {
 		 */
 		if ($data['old']['type'] == 'alias') {
 
+			/*
+			 * Set $data['new']['type'] to 'alias' so we get into
+			 * update()->alias->update()->vhost
+			 */
 			$data['new']['type'] == 'alias';
+			$this->update($event_name, $data);
+
+		}
+
+
+		/*
+		 * Check if we deleted a subdomain
+		 */
+		if ($data['old']['type'] == 'subdomain') {
+
+			/*
+			 * Set $data['new']['type'] to 'subdomain' so we get into
+			 * update()->subdomain->update()->vhost
+			 */
+			$data['new']['type'] == 'subdomain';
 			$this->update($event_name, $data);
 
 		}
