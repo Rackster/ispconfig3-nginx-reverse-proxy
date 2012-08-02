@@ -52,6 +52,17 @@ class vhost {
 	function update($data, $app, $tpl) {
 
 		/*
+		 * if we are just updating, prevent the not readding
+		 * of the vhost file
+		 */
+		if ($data['old']['domain'] == $data['new']['domain']) {
+
+			$data['vhost']['file_new_check'] = 0;
+			$data['vhost']['link_new_check'] = 0;
+
+		}
+
+		/*
 		 * check if the site is no longer active
 		 */
 		if ($data['new']['active'] == 'n') {
