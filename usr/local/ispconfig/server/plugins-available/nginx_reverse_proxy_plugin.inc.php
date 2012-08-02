@@ -286,7 +286,7 @@ class nginx_reverse_proxy_plugin {
 			/*
 			 * Auto-Subdomain handling
 			 */
-			if (!isset($server_alias)) $server_alias = array();
+			$server_alias = array();
 
 			switch($data['new']['subdomain']) {
 
@@ -305,13 +305,16 @@ class nginx_reverse_proxy_plugin {
 			 * Check the DB if there are other alias domains
 			 * and save to $alias_domains
 			 */
-			/*$alias_domains = $app->dbmaster->queryOneRecord('SELECT * FROM web_domain WHERE parent_domain_id = '. $data['new']['parent_domain_id'] .' AND parent_domain_id > 0 AND active = "y"');
+			$alias_result = array();
 
-			exec('echo "' . print_r($alias_domains, true) .'" > /tmp/query.txt');
+			$alias_result = $app->dbmaster->queryOneRecord('SELECT domain, subdomain FROM web_domain WHERE parent_domain_id = '. $data['new']['parent_domain_id'] .' AND parent_domain_id > 0 AND active = "y"');
 
-			if (count($alias_domains) > 0) {
+			exec('echo "'. print_r($alias_result, true) .'" > /tmp/result.txt');
+			exec('echo "'. print_r($data, true) .'" > /tmp/data.txt');
 
-				foreach($alias_domains as $alias) {
+			if (count($alias_result) > 0) {
+
+				foreach($alias_result as $alias) {
 
 					switch($alias['subdomain']) {
 
@@ -325,17 +328,16 @@ class nginx_reverse_proxy_plugin {
 
 						default:
 							$server_alias[] .= $alias['domain'] .' ';
-							break;
 
 					}
-
-					unset($alias);
 
 					$app->log('Add server alias: '. $alias['domain'], LOGLEVEL_DEBUG);
 
 				}
 
-			}*/
+				unset($alias);
+
+			}
 
 
 			/*
@@ -351,7 +353,8 @@ class nginx_reverse_proxy_plugin {
 
 				unset($tmp_alias);
 
-				$tpl->setVar('alias', trim($server_alias_str));
+				//$tpl->setVar('alias', trim($server_alias_str));
+				$tpl->setVar('alias', $server_alias_str);
 
 			} else {
 
@@ -615,16 +618,17 @@ class nginx_reverse_proxy_plugin {
 			 * We will run the update function based on the parent_domain so we
 			 * first have to get it
 			 */
-			//$parent_domain = $app->dbmaster->queryOneRecord('SELECT * FROM web_domain WHERE parent_domain_id = '. $data['new']['parent_domain_id'] .'');
+			$parent_domain = $app->dbmaster->queryOneRecord('SELECT * FROM web_domain WHERE domain_id = '. intval($data['new']['parent_domain_id']) .'');
 
 
 			/*
 			 * Set data to $parent_domain but override the parent_domain_id
 			 */
-			//$parent_domain['parent_domain_id'] = $data['new']['parent_domain_id'];
-			//$data['new'] = $parent_domain;
+			$parent_domain['parent_domain_id'] = $data['new']['parent_domain_id'];
+			$data['old'] = $parent_domain;
+			$data['new'] = $parent_domain;
 
-			//$this->update($event_name, $data);
+			$this->update($event_name, $data);
 
 		}
 
