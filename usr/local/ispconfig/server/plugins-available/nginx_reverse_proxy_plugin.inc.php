@@ -278,6 +278,12 @@ class nginx_reverse_proxy_plugin {
 		if ($data['new']['type'] == 'vhost') {
 
 			/*
+			 * Enable IPv6 support if we have an IP there
+			 */
+			if($data['new']['ipv6_address'] != '') $tpl->setVar('ipv6_enabled', 1);
+
+
+			/*
 			 * Check if SEO redirect is enabled
 			 */
 			if ($data['new']['seo_redirect'] != '' && ($data['new']['subdomain'] == 'www' || $data['new']['subdomain'] == '*')) {
@@ -318,6 +324,7 @@ class nginx_reverse_proxy_plugin {
 			 */
 			$vhosts[] = array(
 				'ip_address' => $data['new']['ip_address'],
+				'ipv6_address' => $data['new']['ipv6_address'],
 				'ssl_enabled' => 0,
 				'port' => 80,
 				'apache2_port' => 82
@@ -339,6 +346,7 @@ class nginx_reverse_proxy_plugin {
 				 */
 				$vhosts[] = array(
 					'ip_address' => $data['new']['ip_address'],
+					'ipv6_address' => $data['new']['ipv6_address'],
 					'ssl_enabled' => 1,
 					'port' => 443,
 					'apache2_port' => 82

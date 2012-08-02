@@ -5,8 +5,13 @@ server {
 	## Server configuration
 	######################################################################
 
-	# Tell nginx to listen on port <tmpl_var name='port'> (default http(s) port)
+	# Tell nginx to listen on port <tmpl_var name='port'> (default http(s) port, IPv4)
 	listen <tmpl_var name='ip_address'>:<tmpl_var name='port'>;
+
+	# Tell nginx to listen on port <tmpl_var name='port'> (default http(s) port, IPv6)
+	<tmpl_if name='ipv6_enabled'>
+	listen [<tmpl_var name='ipv6_address'>]:<tmpl_var name='port'> ipv6only=on;
+	</tmpl_if>
 
 	server_name <tmpl_var name='domain'> <tmpl_if name='alias'><tmpl_var name='alias'></tmpl_if> <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'></tmpl_if>;
 
