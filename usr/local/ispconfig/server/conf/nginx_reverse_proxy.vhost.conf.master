@@ -8,8 +8,8 @@ server {
 	# Tell nginx to listen on port <tmpl_var name='port'> (default http(s) port, IPv4)
 	listen <tmpl_var name='ip_address'>:<tmpl_var name='port'>;
 
-	# Tell nginx to listen on port <tmpl_var name='port'> (default http(s) port, IPv6)
 	<tmpl_if name='ipv6_enabled'>
+	# Tell nginx to listen on port <tmpl_var name='port'> (default http(s) port, IPv6)
 	listen [<tmpl_var name='ipv6_address'>]:<tmpl_var name='port'> ipv6only=on;
 	</tmpl_if>
 

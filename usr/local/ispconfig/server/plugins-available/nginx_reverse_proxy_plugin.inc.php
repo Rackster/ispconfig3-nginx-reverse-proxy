@@ -284,6 +284,45 @@ class nginx_reverse_proxy_plugin {
 
 
 			/*
+			 * Auto-Subdomain handling
+			 */
+			$server_alias = array();
+
+			switch($data['new']['subdomain']) {
+
+				case 'www':
+					$server_alias[] .= 'www.'. $data['new']['domain'] .' ';
+					break;
+
+				case '*':
+					$server_alias[] .= '*.'. $data['new']['domain'] .' ';
+					break;
+
+			}
+
+			/*
+			 * Check if the above function and checks 'returned' an alias domain
+			 * so we know if we have to pass something to the 'vhost' master
+			 */
+			if(count($server_alias) > 0) {
+				$server_alias_str = '';
+
+				foreach($server_alias as $tmp_alias) {
+					$server_alias_str .= $tmp_alias;
+				}
+
+				unset($tmp_alias);
+
+				$tpl->setVar('alias', trim($server_alias_str));
+
+			} else {
+
+				$tpl->setVar('alias', '');
+
+			}
+
+
+			/*
 			 * Check if SEO redirect is enabled
 			 */
 			if ($data['new']['seo_redirect'] != '' && ($data['new']['subdomain'] == 'www' || $data['new']['subdomain'] == '*')) {
