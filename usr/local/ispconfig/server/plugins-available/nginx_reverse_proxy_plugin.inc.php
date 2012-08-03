@@ -741,14 +741,16 @@ class nginx_reverse_proxy_plugin {
 		$app->uses('getconf');
 		$web_config = $app->getconf->get_server_config($conf['server_id'], 'web');
 
-		
+
 		/*
 		 * we run a query to get all domains (not alias- subdomains) which are linked
 		 * with the client we want to delete
 		 */
+		$client_id = intval($data['old']['client_id']);
+
 		$client_vhosts = array();
 
-		$client_vhosts = $app->dbmaster->queryAllRecords('SELECT domain FROM web_domain WHERE sys_userid = $USERID AND parent_domain_id = 0');
+		$client_vhosts = $app->dbmaster->queryAllRecords('SELECT domain FROM web_domain WHERE sys_userid = '. $client_id .' AND parent_domain_id = 0');
 
 		if (count($client_vhosts) > 0) {
 
