@@ -8,32 +8,47 @@ class cert {
 	function insert($data, $app, $suffix) {
 
 		/*
-		 * create the bundled cert file if we have a bundle
+		 * we can only proceed if openssl did create
+		 * the crt and key file
 		 */
-		if ($data['cert']['bundle_check'] == 1) {
+		if ($data['cert']['crt'] != 1 && $data['cert']['key'] != 1) {
 
 			/*
-			 * merge the .crt and .bundle files
+			 * create the bundled cert file if we have a bundle
 			 */
-			exec('cat '. $data['cert']['crt'] .' '. $data['cert']['bundle'] .' > '. $data['cert'][$suffix .'_crt']);
-			$app->log('Merging ssl cert and bundle file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
+			if ($data['cert']['bundle_check'] == 1) {
+
+				/*
+				 * merge the .crt and .bundle files
+				 */
+				exec('cat '. $data['cert']['crt'] .' '. $data['cert']['bundle'] .' > '. $data['cert'][$suffix .'_crt']);
+				$app->log('Merging ssl cert and bundle file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
+
+			} else {
+
+				/*
+				 * copy the secrect .crt file
+				 */
+				exec('cp '. $data['cert']['crt'] .' '. $data['cert'][$suffix .'_crt']);
+				$app->log('Copying ssl cert file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
+
+			}
+
+
+			/*
+			 * copy the secrect .key file
+			 */
+			exec('cp '. $data['cert']['key'] .' '. $data['cert'][$suffix .'_key']);
+			$app->log('Copying ssl key file: '. $data['cert'][$suffix .'_key'], LOGLEVEL_DEBUG);
 
 		} else {
 
 			/*
-			 * copy the secrect .crt file
+			 * Report an error
 			 */
-			exec('cp '. $data['cert']['crt'] .' '. $data['cert'][$suffix .'_crt']);
-			$app->log('Copying ssl cert file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
+			$app->log('Creating '. $suffix .' ssl files failed', LOGLEVEL_DEBUG);
 
 		}
-
-
-		/*
-		 * copy the secrect .key file
-		 */
-		exec('cp '. $data['cert']['key'] .' '. $data['cert'][$suffix .'_key']);
-		$app->log('Copying ssl key file: '. $data['cert'][$suffix .'_key'], LOGLEVEL_DEBUG);
 
 	}
 
