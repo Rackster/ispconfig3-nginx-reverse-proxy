@@ -100,22 +100,6 @@ server {
 		# Don't log access
 		access_log off;
 
-		# Don't log 404 not found
-		log_not_found off;
-
-	}
-
-	location /subdomains {
-
-		# Don't allow any access
-		deny all;
-
-		# Don't log access
-		access_log off;
-
-		# Don't log 404 not found
-		log_not_found off;
-
 	}
 
 	######################################################################
