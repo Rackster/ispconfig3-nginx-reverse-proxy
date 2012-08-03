@@ -71,9 +71,6 @@ server {
 
 	location / {
 
-		# Resolve the proxy_pass address
-		resolver 176.9.221.51;
-
 		# disable access log (we already have it for nginx)
 		access_log off;
 
