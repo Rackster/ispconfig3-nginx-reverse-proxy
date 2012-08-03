@@ -18,3 +18,9 @@ Please refer to the wiki which can be found here: [Wiki](https://github.com/Rack
 ##Contribution
 
 Feel free to be an active part of the project, either by testing and creating issues or forking and sending pull requests.
+
+
+##Disclaimer
+
+I am in no way responsible for any damage caused to your system by using the plugin.    
+Usage at you own risk!
