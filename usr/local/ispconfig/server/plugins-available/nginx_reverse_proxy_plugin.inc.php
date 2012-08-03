@@ -763,6 +763,8 @@ class nginx_reverse_proxy_plugin {
 				$data['old']['domain'] = $vhost['domain'];
 				$this->vhost('delete', $data);
 
+				$app->log('Removing vhost file: '. $data['old']['domain'], LOGLEVEL_DEBUG);
+
 			}
 
 		}
