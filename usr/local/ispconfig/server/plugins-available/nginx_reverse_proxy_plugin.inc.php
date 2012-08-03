@@ -694,7 +694,7 @@ class nginx_reverse_proxy_plugin {
 		 * We just have to delete the vhost file and link
 		 * if we deleted a vhost site
 		 */
-		if ($data['old']['type'] == 'vhost') $this->vhost->('delete', $data);
+		if ($data['old']['type'] == 'vhost') $this->vhost('delete', $data);
 
 
 		/*
