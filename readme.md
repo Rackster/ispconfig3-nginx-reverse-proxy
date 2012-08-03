@@ -20,7 +20,7 @@ Also, you must have a working nginx installation with configurations for the *pr
 
 ##How to install
 
-Please refer to the wiki which can be found here: [Wiki](https://github.com/Rackster/ispconfig-3-nginx-reverse-proxy/wiki).
+Please refer to the wiki which can be found here: [Wiki](https://github.com/Rackster/ispconfig-3-nginx-reverse-proxy/wiki)
 
 
 ##Contribution
