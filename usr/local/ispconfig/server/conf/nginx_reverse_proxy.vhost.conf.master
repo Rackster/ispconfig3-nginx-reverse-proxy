@@ -74,8 +74,30 @@ server {
 		# disable access log (we already have it for nginx)
 		access_log off;
 
+		# Keep the file as long as possible
+		expires max;
+
 		# set the document root
 		root <tmpl_var name='web_document_root_www'>;
+
+		# Set a unique key for the cached object
+		set $memcached_key "$scheme://$host$request_uri";
+
+		# pass all requests to memcached
+		memcached_pass 127.0.0.1:53892;
+
+		# if memcached can't serve a result, pass to apache2
+		error_page 404 = @apache2;
+
+	}
+
+	location @apache2 {
+
+		# disable access log (we already have it for nginx)
+		access_log off;
+
+		# Keep the file as long as possible
+		expires max;
 
 		# cache apache2's answers in the cache
 		proxy_cache nginx_cache;
