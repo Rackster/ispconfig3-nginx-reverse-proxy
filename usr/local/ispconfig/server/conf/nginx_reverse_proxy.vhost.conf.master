@@ -84,7 +84,7 @@ server {
 		set $memcached_key "$scheme://$host$request_uri";
 
 		# pass all requests to memcached
-		memcached_pass 127.0.0.1:53892;
+		memcached_pass 127.0.0.1:11221;
 
 		# if memcached can't serve a result, pass to apache2
 		error_page 404 = @apache2;
