@@ -143,7 +143,7 @@ class nginx_reverse_proxy_plugin {
 		/*
 		 * The check ifself
 		 */
-		if($conf['services']['nginx_reverse_proxy'] == true) {
+		if ($conf['services']['nginx_reverse_proxy'] == true) {
 			return true;
 		} else {
 			return false;
@@ -236,7 +236,7 @@ class nginx_reverse_proxy_plugin {
 		/*
 		 * If $action is not 'insert', let's set it to update
 		 */
-		if($this->action != 'insert') $this->action = 'update';
+		if ($this->action != 'insert') $this->action = 'update';
 
 
 		/*
@@ -280,7 +280,7 @@ class nginx_reverse_proxy_plugin {
 			/*
 			 * Enable IPv6 support if we have an IP there
 			 */
-			if($data['new']['ipv6_address'] != '') $tpl->setVar('ipv6_enabled', 1);
+			if ($data['new']['ipv6_address'] != '') $tpl->setVar('ipv6_enabled', 1);
 
 
 			/*
@@ -341,7 +341,7 @@ class nginx_reverse_proxy_plugin {
 			 * Check if the above function and checks 'returned' an alias domain
 			 * so we know if we have to pass something to the 'vhost' master
 			 */
-			if(count($server_alias) > 0) {
+			if (count($server_alias) > 0) {
 				$server_alias_str = '';
 
 				foreach($server_alias as $tmp_alias) {
@@ -365,10 +365,10 @@ class nginx_reverse_proxy_plugin {
 			 */
 			if (!isset($rewrite_rules)) $rewrite_rules = array();
 
-			if($data['new']['redirect_type'] != '' && $data['new']['redirect_path'] != '') {
+			if ($data['new']['redirect_type'] != '' && $data['new']['redirect_path'] != '') {
 
-				if(substr($data['new']['redirect_path'], -1) != '/') $data['new']['redirect_path'] .= '/';
-				if(substr($data['new']['redirect_path'], 0, 8) == '[scheme]') {
+				if (substr($data['new']['redirect_path'], -1) != '/') $data['new']['redirect_path'] .= '/';
+				if (substr($data['new']['redirect_path'], 0, 8) == '[scheme]') {
 
 					$rewrite_target = 'http'.substr($data['new']['redirect_path'], 8);
 					$rewrite_target_ssl = 'https'.substr($data['new']['redirect_path'], 8);
@@ -637,7 +637,7 @@ class nginx_reverse_proxy_plugin {
 		 * for sites, aliases and subdomains
 		 * -> alias
 		 */
-		if($data['new']['type'] == 'alias') {
+		if ($data['new']['type'] == 'alias') {
 
 			/*
 			 * We will run the update function based on the parent_domain so we
@@ -663,7 +663,7 @@ class nginx_reverse_proxy_plugin {
 		 * for sites, aliases and subdomains
 		 * -> subdomain
 		 */
-		if($data['new']['type'] == 'subdomain') {
+		if ($data['new']['type'] == 'subdomain') {
 
 			/*
 			 * We will run the update function based on the parent_domain so we
