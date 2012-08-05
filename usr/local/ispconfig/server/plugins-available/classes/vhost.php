@@ -11,10 +11,24 @@ class vhost {
 
 			/*
 			 * the vhost file doesn't exist so we have to create it
-			 */
-			exec('touch '. $data['vhost']['file_new']);
+			 * and write the template content
+		   */
+			file_put_contents($data['vhost']['file_new'], $tpl);
 			$data['vhost']['file_new_check'] = 1;
 			$app->log('Creating vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
+			unset($tpl);
+
+		} else {
+
+			/*
+			 * the vhost file is already there, so we make a backup
+			 */
+			exec('mv '. $data['vhost']['file_new'] .' '. $data['vhost']['file_new'] .'~');
+
+			/*
+			 * and rerun the insert function
+			 */
+			$this->insert($data, $app, $tpl);
 
 		}
 
@@ -28,14 +42,6 @@ class vhost {
 			$app->log('Creating vhost symlink: '. $data['vhost']['link_new_check'], LOGLEVEL_DEBUG);
 
 		}
-
-
-		/*
-		 * Write the template content
-		 */
-		file_put_contents($data['vhost']['file_new'], $tpl);
-		$app->log('Writing the vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
-		unset($tpl);
 
 
 		/*
@@ -88,7 +94,7 @@ class vhost {
 		 * The site was renamed, so we have to delete the old vhost and create the new
 		 */
 		$this->delete($data, $app);
-		$this->insert($data, $app, $tpl);
+		return $this->insert($data, $app, $tpl);
 
 	}
 
@@ -119,12 +125,6 @@ class vhost {
 			$app->log('Removing vhost symlink: '. $data['vhost']['link_old'], LOGLEVEL_DEBUG);
 
 		}
-
-
-		/*
-		 * return the $data['vhost'] array
-		 */
-		return $data['vhost'];
 
 	}
 

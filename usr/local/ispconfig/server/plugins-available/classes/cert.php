@@ -23,11 +23,13 @@ class cert {
 				 */
 				exec('echo "" > /tmp/ispconfig3_newline_fix');
 
+
 				/*
 				 * merge the .crt and .bundle files
 				 */
 				exec('cat '. $data['cert']['crt'] .' /tmp/ispconfig3_newline_fix '. $data['cert']['bundle'] .' > '. $data['cert'][$suffix .'_crt']);
 				$app->log('Merging ssl cert and bundle file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
+
 
 				/*
 				 * remove the file we created to fix the newline
@@ -37,7 +39,7 @@ class cert {
 			} else {
 
 				/*
-				 * copy the secrect .crt file
+				 * copy the .crt file
 				 */
 				exec('cp '. $data['cert']['crt'] .' '. $data['cert'][$suffix .'_crt']);
 				$app->log('Copying ssl cert file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);

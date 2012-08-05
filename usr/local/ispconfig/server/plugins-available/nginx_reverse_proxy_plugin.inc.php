@@ -625,7 +625,7 @@ class nginx_reverse_proxy_plugin {
 			 */
 			if ($this->action == 'update') {
 
-				$this->vhost('update', $data, $tpl->grab());
+				$vhost_backup = $this->vhost('update', $data, $tpl->grab());
 
 			}
 
@@ -688,6 +688,14 @@ class nginx_reverse_proxy_plugin {
 		 * Everything done here, so let's restart nginx
 		 */
 		exec($final_command);
+
+
+		/*
+		 * everything went hopefully well, so we can now
+		 * delete the vhosts backup
+		 */
+		if (isset($vhost_backup)) unlink($vhost_backup['file_new'] .'~');
+		unset($vhost_backup);
 
 
 		/*
