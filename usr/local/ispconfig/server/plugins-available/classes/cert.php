@@ -19,10 +19,20 @@ class cert {
 			if ($data['cert']['bundle_check'] == 1) {
 
 				/*
+				 * create an empty file to ensure newline between the .crt and .bundle
+				 */
+				exec('echo "" > /tmp/ispconfig3_newline_fix');
+
+				/*
 				 * merge the .crt and .bundle files
 				 */
-				exec('cat '. $data['cert']['crt'] .' /usr/local/ispconfig/server/plugins-available/classes/newline.txt '. $data['cert']['bundle'] .' > '. $data['cert'][$suffix .'_crt']);
+				exec('cat '. $data['cert']['crt'] .' '. $data['cert']['bundle'] .' > '. $data['cert'][$suffix .'_crt']);
 				$app->log('Merging ssl cert and bundle file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
+
+				/*
+				 * remove the file we created to fix the newline
+				 */
+				exec('rm /tmp/ispconfig3_newline_fix');
 
 			} else {
 
