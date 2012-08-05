@@ -1,0 +1,96 @@
+<h2><tmpl_var name="list_head_txt"></h2>
+<p><tmpl_var name="list_desc_txt"></p>
+
+<div class="panel panel_web_domain">
+
+	<div class="pnl_formsarea">
+		<fieldset class="inlineLabels">
+				<input name="document_root" id="document_root" value="{tmpl_var name='document_root'}" size="30" maxlength="255" type="hidden" class="textInput" />
+			<div class="ctrlHolder">
+				<label for="system_user">{tmpl_var name='system_user_txt'}</label>
+		<label for="system_user">{tmpl_var name='system_user'}</label>
+				<input name="system_user" id="system_user" value="{tmpl_var name='system_user'}" type="hidden" />
+			</div>
+			<div class="ctrlHolder">
+				<label for="system_group">{tmpl_var name='system_group_txt'}</label>
+		<label for="system_group">{tmpl_var name='system_group'}</label>
+				<input name="system_group" id="system_group" value="{tmpl_var name='system_group'}" type="hidden" />
+			</div>
+		<div class="ctrlHolder apache">
+				<label for="allow_override">{tmpl_var name='allow_override_txt'}</label>
+				<input name="allow_override" id="allow_override" value="{tmpl_var name='allow_override'}" size="30" maxlength="255" type="text" class="textInput" />
+		</div>
+		<div class="ctrlHolder nginx">
+				<p class="label">{tmpl_var name='php_fpm_use_socket_txt'}</p>
+					<div class="multiField">
+						{tmpl_var name='php_fpm_use_socket'}
+					</div>
+			</div>
+		<div class="ctrlHolder nginx">
+				<label for="pm_max_children">{tmpl_var name='pm_max_children_txt'}</label>
+				<input name="pm_max_children" id="pm_max_children" value="{tmpl_var name='pm_max_children'}" size="3" maxlength="3" type="text" class="textInput formLengthLimit" />
+			</div>
+	<div class="ctrlHolder nginx">
+				<label for="pm_start_servers">{tmpl_var name='pm_start_servers_txt'}</label>
+				<input name="pm_start_servers" id="pm_start_servers" value="{tmpl_var name='pm_start_servers'}" size="3" maxlength="3" type="text" class="textInput formLengthLimit" />
+			</div>
+	<div class="ctrlHolder nginx">
+				<label for="pm_min_spare_servers">{tmpl_var name='pm_min_spare_servers_txt'}</label>
+				<input name="pm_min_spare_servers" id="pm_min_spare_servers" value="{tmpl_var name='pm_min_spare_servers'}" size="3" maxlength="3" type="text" class="textInput formLengthLimit" />
+			</div>
+	<div class="ctrlHolder nginx">
+				<label for="pm_max_spare_servers">{tmpl_var name='pm_max_spare_servers_txt'}</label>
+				<input name="pm_max_spare_servers" id="pm_max_spare_servers" value="{tmpl_var name='pm_max_spare_servers'}" size="3" maxlength="3" type="text" class="textInput formLengthLimit" />
+			</div>
+		<div class="ctrlHolder">
+				<label for="php_open_basedir">{tmpl_var name='php_open_basedir_txt'}</label>
+				<input name="php_open_basedir" id="php_open_basedir" value="{tmpl_var name='php_open_basedir'}" size="30" type="text" class="textInput"  style="width:400px;" />
+		</div>
+		<div class="ctrlHolder">
+				<label for="custom_php_ini">{tmpl_var name='custom_php_ini_txt'}</label>
+				<textarea name="custom_php_ini" id="custom_php_ini" rows='10' cols='50' style="width:400px;">{tmpl_var name='custom_php_ini'}</textarea>
+		</div>
+			<div class="ctrlHolder apache">
+				<label for="apache_directives">{tmpl_var name='apache_directives_txt'}</label>
+				<textarea name="apache_directives" id="apache_directives" rows='10' cols='50' style="width:400px;">{tmpl_var name='apache_directives'}</textarea>
+		</div>
+			<div class="ctrlHolder nginx">
+				<label for="nginx_directives">{tmpl_var name='nginx_directives_txt'}</label>
+				<textarea name="nginx_directives" id="nginx_directives" rows='10' cols='50' style="width:400px;">{tmpl_var name='nginx_directives'}</textarea>
+		</div>
+		</fieldset>
+
+		<input type="hidden" name="id" value="{tmpl_var name='id'}">
+
+		<div class="buttonHolder buttons">
+			<button class="positive iconstxt icoPositive" type="button" value="{tmpl_var name='btn_save_txt'}" onClick="submitForm('pageForm','sites/web_domain_edit.php');"><span>{tmpl_var name='btn_save_txt'}</span></button>
+			<button class="negative iconstxt icoNegative" type="button" value="{tmpl_var name='btn_cancel_txt'}" onClick="loadContent('sites/web_domain_list.php');"><span>{tmpl_var name='btn_cancel_txt'}</span></button>
+		</div>
+	</div>
+
+</div>
+<script language="JavaScript" type="text/javascript">
+		var webId = jQuery('input[name="id"]').val();
+		var serverId;
+		getServerId();
+		adjustForm();
+
+		function getServerId(){
+			jQuery.getJSON('sites/ajax_get_json.php'+ '?' + Math.round(new Date().getTime()), {web_id : webId, type : "getserverid"}, function(data) {
+				serverId = data.serverid;
+			});
+		}
+
+		function adjustForm(){
+			jQuery.getJSON('sites/ajax_get_json.php'+ '?' + Math.round(new Date().getTime()), {server_id : serverId, type : "getservertype"}, function(data) {
+				if(data.servertype == "nginx"){
+					jQuery('.nginx').show();
+					jQuery('.apache').hide();
+				} else {
+					jQuery('.nginx').show();
+					jQuery('.apache').show();
+				}
+			});
+		}
+
+</script>
