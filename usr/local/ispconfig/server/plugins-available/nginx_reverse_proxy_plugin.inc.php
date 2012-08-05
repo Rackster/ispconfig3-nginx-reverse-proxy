@@ -571,7 +571,7 @@ class nginx_reverse_proxy_plugin {
 					$vhosts[] = array(
 						'ip_address' => $data['new']['ip_address'],
 						'ipv6_address' => $data['new']['ipv6_address'],
-						'ssl_enabled' => 0,
+						'ssl_enabled' => 1,
 						'rewrite_enabled' => 1,
 						'redirects' => $rewrite_rules,
 						'port' => 443,
@@ -583,7 +583,7 @@ class nginx_reverse_proxy_plugin {
 					$vhosts[] = array(
 						'ip_address' => $data['new']['ip_address'],
 						'ipv6_address' => $data['new']['ipv6_address'],
-						'ssl_enabled' => 0,
+						'ssl_enabled' => 1,
 						'rewrite_enabled' => 0,
 						'redirects' => '',
 						'port' => 443,
