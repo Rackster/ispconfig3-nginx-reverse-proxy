@@ -496,6 +496,34 @@ class nginx_reverse_proxy_plugin {
 
 
 			/*
+			 * Custom nginx directives from the
+			 * ISPConfig field
+			 */
+			$final_nginx_directives = array();
+			$nginx_directives = $data['new']['nginx_directives'];
+
+
+			/*
+			 * Make sure we only have UNIX linebreaks
+			 */
+			$nginx_directives = str_replace("\r\n", "\n", $nginx_directives);
+			$nginx_directives = str_replace("\r", "\n", $nginx_directives);
+			$nginx_directive_lines = explode("\n", $nginx_directives);
+
+			if (is_array($nginx_directive_lines) && !empty($nginx_directive_lines)) {
+
+				foreach($nginx_directive_lines as $nginx_directive_line) {
+
+					$final_nginx_directives[] = array('nginx_directive' => $nginx_directive_line);
+
+				}
+
+			}
+
+			$tpl->setLoop('nginx_directives', $final_nginx_directives);
+
+
+			/*
 			 * Put the default non-SSL vhost into the loop array
 			 */
 			if (count($rewrite_rules) > 0) {
@@ -543,7 +571,7 @@ class nginx_reverse_proxy_plugin {
 					$vhosts[] = array(
 						'ip_address' => $data['new']['ip_address'],
 						'ipv6_address' => $data['new']['ipv6_address'],
-						'ssl_enabled' => 0,
+						'ssl_enabled' => 1,
 						'rewrite_enabled' => 1,
 						'redirects' => $rewrite_rules,
 						'port' => 443,
@@ -555,7 +583,7 @@ class nginx_reverse_proxy_plugin {
 					$vhosts[] = array(
 						'ip_address' => $data['new']['ip_address'],
 						'ipv6_address' => $data['new']['ipv6_address'],
-						'ssl_enabled' => 0,
+						'ssl_enabled' => 1,
 						'rewrite_enabled' => 0,
 						'redirects' => '',
 						'port' => 443,
