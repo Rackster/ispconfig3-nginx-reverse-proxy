@@ -26,7 +26,7 @@ class cert {
 				/*
 				 * merge the .crt and .bundle files
 				 */
-				exec('cat '. $data['cert']['crt'] .' '. $data['cert']['bundle'] .' > '. $data['cert'][$suffix .'_crt']);
+				exec('cat '. $data['cert']['crt'] .' /tmp/ispconfig3_newline_fix '. $data['cert']['bundle'] .' > '. $data['cert'][$suffix .'_crt']);
 				$app->log('Merging ssl cert and bundle file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
 
 				/*
