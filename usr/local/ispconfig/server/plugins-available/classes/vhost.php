@@ -18,19 +18,6 @@ class vhost {
 			$app->log('Creating vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
 			unset($tpl);
 
-		} else {
-
-			/*
-			 * the vhost file is already there, so we make a backup
-			 */
-			exec('mv '. $data['vhost']['file_new'] .' '. $data['vhost']['file_new'] .'~');
-
-			/*
-			 * and rerun the insert function
-			 */
-			$data['vhost']['file_new_check'] = 0;
-			$this->insert($data, $app, $tpl);
-
 		}
 
 		if ($data['vhost']['link_new_check'] != 1) {
@@ -59,17 +46,6 @@ class vhost {
 	function update($data, $app, $tpl) {
 
 		/*
-		 * if we are just updating, prevent the not readding
-		 * of the vhost file
-		 */
-		if ($data['old']['domain'] == $data['new']['domain']) {
-
-			$data['vhost']['file_new_check'] = 0;
-			$data['vhost']['link_new_check'] = 0;
-
-		}
-
-		/*
 		 * check if the site is no longer active
 		 */
 		if ($data['new']['active'] == 'n') {
@@ -79,7 +55,6 @@ class vhost {
 			 * the delete function to NOT delete the vhost file
 			 * and the insert function, to NOT create the vhost link
 			 */
-			$data['vhost']['file_old_check'] = 0;
 			$data['vhost']['link_new_check'] = 1;
 
 
@@ -90,6 +65,14 @@ class vhost {
 			if ($data['old']['domain'] != $data['new']['domain']) $data['vhost']['file_old_check'] = 1;
 
 		}
+
+
+		/*
+		 * create a backup of the vhost file
+		 */
+		exec('mv '. $data['vhost']['file_new'] .' '. $data['vhost']['file_new'] .'~');
+		$data['vhost']['file_new_check'] = 0;
+
 
 		/*
 		 * The site was renamed, so we have to delete the old vhost and create the new
