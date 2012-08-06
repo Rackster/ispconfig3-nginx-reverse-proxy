@@ -11,7 +11,7 @@ class cert {
 		 * we can only proceed if openssl did create
 		 * the crt and key file
 		 */
-		if ($data['cert']['crt'] == 1 && $data['cert']['key'] == 1) {
+		if ($data['cert']['crt_check'] == 1 && $data['cert']['key_check'] == 1) {
 
 			/*
 			 * create the bundled cert file if we have a bundle
