@@ -7,16 +7,14 @@ class vhost {
 	 */
 	function insert($data, $app, $tpl) {
 
-		if ($data['vhost']['file_new_check'] != 1) {
-
-			/*
-			 * the vhost file doesn't exist so we have to create it
-			 */
-			exec('touch '. $data['vhost']['file_new']);
-			$data['vhost']['file_new_check'] = 1;
-			$app->log('Creating vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
-
-		}
+		/*
+		 * the vhost file doesn't exist so we have to create it
+		 * and write the template content
+		 */
+		file_put_contents($data['vhost']['file_new'], $tpl);
+		$data['vhost']['file_new_check'] = 1;
+		$app->log('Creating vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
+		unset($tpl);
 
 		if ($data['vhost']['link_new_check'] != 1) {
 
@@ -28,14 +26,6 @@ class vhost {
 			$app->log('Creating vhost symlink: '. $data['vhost']['link_new_check'], LOGLEVEL_DEBUG);
 
 		}
-
-
-		/*
-		 * Write the template content
-		 */
-		file_put_contents($data['vhost']['file_new'], $tpl);
-		$app->log('Writing the vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
-		unset($tpl);
 
 
 		/*
@@ -52,15 +42,11 @@ class vhost {
 	function update($data, $app, $tpl) {
 
 		/*
-		 * if we are just updating, prevent the not readding
-		 * of the vhost file
+		 * fix remove of sites-enabled if site
+		 * gets an update
 		 */
-		if ($data['old']['domain'] == $data['new']['domain']) {
+		$data['vhost']['link_new_check'] = 0;
 
-			$data['vhost']['file_new_check'] = 0;
-			$data['vhost']['link_new_check'] = 0;
-
-		}
 
 		/*
 		 * check if the site is no longer active
@@ -72,23 +58,24 @@ class vhost {
 			 * the delete function to NOT delete the vhost file
 			 * and the insert function, to NOT create the vhost link
 			 */
-			$data['vhost']['file_old_check'] = 0;
 			$data['vhost']['link_new_check'] = 1;
 
-
-			/*
-			 * If the site got renamed and set to inactive,
-			 * we still have to remove the old vhost file and link
-			 */
-			if ($data['old']['domain'] != $data['new']['domain']) $data['vhost']['file_old_check'] = 1;
-
 		}
+
+
+		/*
+		 * create a backup of the vhost file
+		 */
+		exec('mv '. $data['vhost']['file_new'] .' '. $data['vhost']['file_new'] .'~');
+		$data['vhost']['file_new_check'] = 0;
+		$data['vhost']['file_old_check'] = 0;
+
 
 		/*
 		 * The site was renamed, so we have to delete the old vhost and create the new
 		 */
 		$this->delete($data, $app);
-		$this->insert($data, $app, $tpl);
+		return $this->insert($data, $app, $tpl);
 
 	}
 
@@ -119,12 +106,6 @@ class vhost {
 			$app->log('Removing vhost symlink: '. $data['vhost']['link_old'], LOGLEVEL_DEBUG);
 
 		}
-
-
-		/*
-		 * return the $data['vhost'] array
-		 */
-		return $data['vhost'];
 
 	}
 

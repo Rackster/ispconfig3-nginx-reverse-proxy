@@ -11,7 +11,7 @@ class cert {
 		 * we can only proceed if openssl did create
 		 * the crt and key file
 		 */
-		if ($data['cert']['crt'] != 1 && $data['cert']['key'] != 1) {
+		if ($data['cert']['crt_check'] == 1 && $data['cert']['key_check'] == 1) {
 
 			/*
 			 * create the bundled cert file if we have a bundle
@@ -19,15 +19,27 @@ class cert {
 			if ($data['cert']['bundle_check'] == 1) {
 
 				/*
+				 * create an empty file to ensure newline between the .crt and .bundle
+				 */
+				exec('echo "" > /tmp/ispconfig3_newline_fix');
+
+
+				/*
 				 * merge the .crt and .bundle files
 				 */
-				exec('cat '. $data['cert']['crt'] .' '. $data['cert']['bundle'] .' > '. $data['cert'][$suffix .'_crt']);
+				exec('cat '. $data['cert']['crt'] .' /tmp/ispconfig3_newline_fix '. $data['cert']['bundle'] .' > '. $data['cert'][$suffix .'_crt']);
 				$app->log('Merging ssl cert and bundle file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
+
+
+				/*
+				 * remove the file we created to fix the newline
+				 */
+				exec('rm /tmp/ispconfig3_newline_fix');
 
 			} else {
 
 				/*
-				 * copy the secrect .crt file
+				 * copy the .crt file
 				 */
 				exec('cp '. $data['cert']['crt'] .' '. $data['cert'][$suffix .'_crt']);
 				$app->log('Copying ssl cert file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
