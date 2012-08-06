@@ -12,7 +12,7 @@ class vhost {
 			/*
 			 * the vhost file doesn't exist so we have to create it
 			 * and write the template content
-		   */
+			 */
 			file_put_contents($data['vhost']['file_new'], $tpl);
 			$data['vhost']['file_new_check'] = 1;
 			$app->log('Creating vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
@@ -28,6 +28,7 @@ class vhost {
 			/*
 			 * and rerun the insert function
 			 */
+			$data['vhost']['file_new_check'] = 0;
 			$this->insert($data, $app, $tpl);
 
 		}
