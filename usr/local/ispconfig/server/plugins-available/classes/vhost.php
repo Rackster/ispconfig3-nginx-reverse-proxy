@@ -7,18 +7,14 @@ class vhost {
 	 */
 	function insert($data, $app, $tpl) {
 
-		if ($data['vhost']['file_new_check'] != 1) {
-
-			/*
-			 * the vhost file doesn't exist so we have to create it
-			 * and write the template content
-			 */
-			file_put_contents($data['vhost']['file_new'], $tpl);
-			$data['vhost']['file_new_check'] = 1;
-			$app->log('Creating vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
-			unset($tpl);
-
-		}
+		/*
+		 * the vhost file doesn't exist so we have to create it
+		 * and write the template content
+		 */
+		file_put_contents($data['vhost']['file_new'], $tpl);
+		$data['vhost']['file_new_check'] = 1;
+		$app->log('Creating vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
+		unset($tpl);
 
 		if ($data['vhost']['link_new_check'] != 1) {
 
