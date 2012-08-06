@@ -53,13 +53,6 @@ class vhost {
 			 */
 			$data['vhost']['link_new_check'] = 1;
 
-
-			/*
-			 * If the site got renamed and set to inactive,
-			 * we still have to remove the old vhost file and link
-			 */
-			if ($data['old']['domain'] != $data['new']['domain']) $data['vhost']['file_old_check'] = 1;
-
 		}
 
 
