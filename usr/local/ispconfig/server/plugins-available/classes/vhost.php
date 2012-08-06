@@ -42,6 +42,13 @@ class vhost {
 	function update($data, $app, $tpl) {
 
 		/*
+		 * fix remove of sites-enabled if site
+		 * gets an update
+		 */
+		$data['vhost']['link_new_check'] = 0;
+
+
+		/*
 		 * check if the site is no longer active
 		 */
 		if ($data['new']['active'] == 'n') {
@@ -61,6 +68,7 @@ class vhost {
 		 */
 		exec('mv '. $data['vhost']['file_new'] .' '. $data['vhost']['file_new'] .'~');
 		$data['vhost']['file_new_check'] = 0;
+		$data['vhost']['file_old_check'] = 0;
 
 
 		/*
