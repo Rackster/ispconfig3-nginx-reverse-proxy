@@ -12,7 +12,7 @@ Afterwards, all requests to port 80 or 443 (default http(s) ports) are fetched b
 
 ##How to install
 
-Please refer to the wiki which can be found here: [Wiki](https://github.com/Rackster/ispconfig-3-nginx-reverse-proxy/wiki)
+Please refer to the wiki which can be found here: [Wiki](https://github.com/Rackster/ispconfig3-nginx-reverse-proxy/wiki)
 
 
 ##Contribution
@@ -22,5 +22,5 @@ Feel free to be an active part of the project, either by testing and creating is
 
 ##Disclaimer
 
-I am in no way responsible for any damage caused to your system by using the plugin.    
+I am in no way responsible for any damage caused to your system by using the plugin.
 Usage at you own risk!
