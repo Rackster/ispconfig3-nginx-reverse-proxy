@@ -256,7 +256,7 @@ class nginx_reverse_proxy_plugin {
 		 * the file is located within /usr/local/ispconfig/server/conf/
 		 */
 		$tpl = new tpl();
-		$tpl->newTemplate('nginx_reverse_proxy.vhost.conf.master');
+		$tpl->newTemplate('nginx_reverse_proxy_plugin.vhost.conf.master');
 
 
 		/*
