@@ -142,7 +142,7 @@ class nginx_reverse_proxy_plugin {
 		/*
 		 * The check ifself
 		 */
-		if ($conf['services']['nginx_reverse_proxy'] == true) {
+		if ($conf['services']['nginx_reverse_proxy_plugin'] == true) {
 			return true;
 		} else {
 			return false;
