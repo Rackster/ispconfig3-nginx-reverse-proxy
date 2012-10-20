@@ -130,7 +130,6 @@ class nginx_reverse_proxy_plugin {
 	}
 
 
-
 	/*
 	 * The onInstall() function is called during ISPConfig installation.
 	 * Based on your input/selection, it decides if a symlink for the plugin
