@@ -81,7 +81,7 @@ server {
 		proxy_cache nginx_cache;
 
 		# pass all requests to apache2
-		proxy_pass http://<tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'><tmpl_else>127.0.0.1</tmpl_if>:<tmpl_var name='apache2_port'>;
+		proxy_pass http://127.0.0.1:<tmpl_var name='apache2_port'>;
 
 	}
 
