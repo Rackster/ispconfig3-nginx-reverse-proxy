@@ -76,6 +76,9 @@ server {
 
 	location / {
 
+		# naxsi protection rules
+		include /etc/nginx/naxsi.rules;
+
 		# disable access log (we already have it for nginx)
 		access_log off;
 
@@ -89,6 +92,11 @@ server {
 		proxy_pass http://127.0.0.1:<tmpl_var name='apache2_port'>;
 
 	}
+
+	# naxsi location
+	location /forbidden {
+		return 403;
+   	}
 
 	location ~ /\. {
 
