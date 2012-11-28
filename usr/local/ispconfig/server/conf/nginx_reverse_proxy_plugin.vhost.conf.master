@@ -9,8 +9,8 @@ server {
 	listen <tmpl_var name='ip_address'>:<tmpl_var name='port'>;
 
 	<tmpl_if name='ipv6_enabled'>
-	# Tell nginx to listen on port <tmpl_var name='port'> (default http(s) port, IPv6)
-	listen [<tmpl_var name='ipv6_address'>]:<tmpl_var name='port'> ipv6only=on;
+		# Tell nginx to listen on port <tmpl_var name='port'> (default http(s) port, IPv6)
+		listen [<tmpl_var name='ipv6_address'>]:<tmpl_var name='port'> ipv6only=on;
 	</tmpl_if>
 
 	server_name <tmpl_var name='domain'> <tmpl_if name='alias'><tmpl_var name='alias'></tmpl_if> <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'></tmpl_if>;
@@ -23,32 +23,39 @@ server {
 	error_log /var/log/ispconfig/httpd/<tmpl_var name='domain'>/error.log;
 
 	<tmpl_if name='ssl_enabled'>
-	######################################################################
-	## SSL configuration
-	######################################################################
+		######################################################################
+		## SSL configuration
+		######################################################################
 
-	ssl on;
-	ssl_certificate <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.crt;
-	ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.key;
+		ssl on;
+		ssl_certificate <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.crt;
+		ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.key;
 	</tmpl_if>
 
 	######################################################################
 	## Redirects configuration
 	######################################################################
 
+	<tmpl_if name='ssl_enabled'>
+		<tmpl_if name='port' op='==' value='80'>
+			# Redirect http -> https
+			rewrite ^ https://$server_name$request_uri? permanent;
+		</tmpl_if>
+	</tmpl_if>
+
 	<tmpl_if name='seo_redirect_enabled'>
-	# SEO Redirect
-	if ($http_host = "<tmpl_var name='seo_redirect_origin_domain'>") {
-		rewrite ^ $scheme://<tmpl_var name='seo_redirect_target_domain'>$request_uri permanent;
-	}
+		# SEO Redirect
+		if ($http_host = "<tmpl_var name='seo_redirect_origin_domain'>") {
+			rewrite ^ $scheme://<tmpl_var name='seo_redirect_target_domain'>$request_uri permanent;
+		}
 	</tmpl_if>
 
 	<tmpl_if name='rewrite_enabled'>
 		<tmpl_loop name="redirects">
-		# Redirects
-		#if ($http_host ~* "<tmpl_var name='rewrite_domain'>$") {
-		#	rewrite ^/(.+)$ <tmpl_var name='rewrite_target'>$1 <tmpl_var name='rewrite_type'>;
-		#}
+			# Redirects
+			#if ($http_host ~* "<tmpl_var name='rewrite_domain'>$") {
+			#	rewrite ^/(.+)$ <tmpl_var name='rewrite_target'>$1 <tmpl_var name='rewrite_type'>;
+			#}
 		</tmpl_loop>
 	</tmpl_if>
 
