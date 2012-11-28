@@ -521,6 +521,21 @@ class nginx_reverse_proxy_plugin {
 
 			$tpl->setLoop('nginx_directives', $final_nginx_directives);
 
+			/*
+			 * Check if the site is SSL enabled
+			 */
+			$crt_file = escapeshellcmd($data['new']['document_root'] .'/ssl/'. $data['new']['ssl_domain'] .'.crt');
+			$key_file = escapeshellcmd($data['new']['document_root'] .'/ssl/'. $data['new']['ssl_domain'] .'.key');
+			if ($data['new']['ssl_domain'] != '' && $data['new']['ssl'] == 'y' && is_file($crt_file) && is_file($key_file) && (filesize($crt_file) > 0) && (filesize($key_file) > 0)) {
+
+				$http_to_https = 1;
+
+			} else {
+
+				$http_to_https = 0;
+
+			}
+
 
 			/*
 			 * Put the default non-SSL vhost into the loop array
@@ -531,6 +546,7 @@ class nginx_reverse_proxy_plugin {
 					'ip_address' => $data['new']['ip_address'],
 					'ipv6_address' => $data['new']['ipv6_address'],
 					'ssl_enabled' => 0,
+					'http_to_https' => $http_to_https,
 					'rewrite_enabled' => 1,
 					'redirects' => $rewrite_rules,
 					'port' => 80,
@@ -543,6 +559,7 @@ class nginx_reverse_proxy_plugin {
 					'ip_address' => $data['new']['ip_address'],
 					'ipv6_address' => $data['new']['ipv6_address'],
 					'ssl_enabled' => 0,
+					'http_to_https' => $http_to_https,
 					'rewrite_enabled' => 0,
 					'redirects' => '',
 					'port' => 80,
@@ -555,9 +572,7 @@ class nginx_reverse_proxy_plugin {
 			/*
 			 * Check if the site is SSL enabled
 			 */
-			$crt_file = escapeshellcmd($data['new']['document_root'] .'/ssl/'. $data['new']['ssl_domain'] .'.crt');
-			$key_file = escapeshellcmd($data['new']['document_root'] .'/ssl/'. $data['new']['ssl_domain'] .'.key');
-			if ($data['new']['ssl_domain'] != '' && $data['new']['ssl'] == 'y' && is_file($crt_file) && is_file($key_file) && (filesize($crt_file) > 0) && (filesize($key_file) > 0)) {
+			if ($http_to_https == 1) {
 
 				$vhost_data['web_document_root_ssl'] = $data['new']['document_root'] .'/ssl';
 
@@ -571,6 +586,7 @@ class nginx_reverse_proxy_plugin {
 						'ip_address' => $data['new']['ip_address'],
 						'ipv6_address' => $data['new']['ipv6_address'],
 						'ssl_enabled' => 1,
+						'http_to_https' => 0,
 						'rewrite_enabled' => 1,
 						'redirects' => $rewrite_rules,
 						'port' => 443,
@@ -583,6 +599,7 @@ class nginx_reverse_proxy_plugin {
 						'ip_address' => $data['new']['ip_address'],
 						'ipv6_address' => $data['new']['ipv6_address'],
 						'ssl_enabled' => 1,
+						'http_to_https' => 0,
 						'rewrite_enabled' => 0,
 						'redirects' => '',
 						'port' => 443,

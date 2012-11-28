@@ -36,11 +36,9 @@ server {
 	## Redirects configuration
 	######################################################################
 
-	<tmpl_if name='ssl_enabled'>
-		<tmpl_if name='port' op='==' value='80'>
-			# Redirect http -> https
-			rewrite ^ https://$server_name$request_uri? permanent;
-		</tmpl_if>
+	<tmpl_if name='http_to_https'>
+		# Redirect http -> https
+		rewrite ^ https://$server_name$request_uri? permanent;
 	</tmpl_if>
 
 	<tmpl_if name='seo_redirect_enabled'>
