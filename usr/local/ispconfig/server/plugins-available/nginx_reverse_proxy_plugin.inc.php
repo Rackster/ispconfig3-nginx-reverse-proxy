@@ -505,7 +505,7 @@ class nginx_reverse_proxy_plugin {
 			/*
 			 *
 			 */
-			$errordocs = $data['new']['errordocs'];
+			$errordocs = !$data['new']['errordocs'];
 
 
 			/*
