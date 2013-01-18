@@ -5,22 +5,19 @@ server {
 	## Server configuration
 	######################################################################
 
-	# Tell nginx to listen on port <tmpl_var name='port'> (default http(s) port, IPv4)
 	listen <tmpl_var name='ip_address'>:<tmpl_var name='port'>;
-
 	<tmpl_if name='ipv6_enabled'>
-		# Tell nginx to listen on port <tmpl_var name='port'> (default http(s) port, IPv6)
 		listen [<tmpl_var name='ipv6_address'>]:<tmpl_var name='port'> ipv6only=on;
 	</tmpl_if>
-
 	server_name <tmpl_var name='domain'> <tmpl_if name='alias'><tmpl_var name='alias'></tmpl_if> <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'></tmpl_if>;
+
+	root <tmpl_var name='web_document_root_www'>;
 
 	######################################################################
 	## Log configuration
 	######################################################################
 
-	access_log /var/log/ispconfig/httpd/<tmpl_var name='domain'>/access.log combined;
-	error_log /var/log/ispconfig/httpd/<tmpl_var name='domain'>/error.log;
+	access_log off;
 
 	<tmpl_if name='ssl_enabled'>
 		######################################################################
@@ -74,39 +71,34 @@ server {
 	## Locations configuration
 	######################################################################
 
+	# alias to local error docs
+	<tmpl_if name='errordocs'>
+		location ^~ /error {
+			root /var/www;
+		}
+	</tmpl_if>
+
+	# disallow dotfile access
+	location ^~ /\. {
+		deny all;
+		return 404;
+	}
+
+	# default location
 	location / {
+		#include /etc/nginx/naxsi/default.rules;
+		include /etc/nginx/conf.d/proxy.conf;
 
-		# naxsi protection rules
-		include /etc/nginx/naxsi.rules;
-
-		# disable access log (we already have it for nginx)
-		access_log off;
-
-		# set the document root
-		root <tmpl_var name='web_document_root_www'>;
-
-		# cache apache2's answers in the cache
 		proxy_cache nginx_cache;
-
-		# pass all requests to apache2
 		proxy_pass http://127.0.0.1:<tmpl_var name='apache2_port'>;
 
 	}
 
-	# naxsi location
-	location /forbidden {
+	# naxsi cellar
+	location /blocked {
 		return 403;
+		#proxy_pass http://127.0.0.1:4242; # learning mode
    	}
-
-	location ~ /\. {
-
-		# Don't allow any access
-		deny all;
-
-		# Don't log access
-		access_log off;
-
-	}
 
 	######################################################################
 	## Directives configuration

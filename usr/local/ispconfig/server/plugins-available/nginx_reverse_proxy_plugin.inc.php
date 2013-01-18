@@ -503,6 +503,12 @@ class nginx_reverse_proxy_plugin {
 
 
 			/*
+			 *
+			 */
+			$errordocs = !$data['new']['errordocs'];
+
+
+			/*
 			 * Make sure we only have UNIX linebreaks
 			 */
 			$nginx_directives = str_replace("\r\n", "\n", $nginx_directives);
@@ -549,6 +555,7 @@ class nginx_reverse_proxy_plugin {
 					'http_to_https' => $http_to_https,
 					'rewrite_enabled' => 1,
 					'redirects' => $rewrite_rules,
+					'errordocs' => $errordocs,
 					'port' => 80,
 					'apache2_port' => 82
 				);
@@ -562,6 +569,7 @@ class nginx_reverse_proxy_plugin {
 					'http_to_https' => $http_to_https,
 					'rewrite_enabled' => 0,
 					'redirects' => '',
+					'errordocs' => $errordocs,
 					'port' => 80,
 					'apache2_port' => 82
 				);
@@ -589,6 +597,7 @@ class nginx_reverse_proxy_plugin {
 						'http_to_https' => 0,
 						'rewrite_enabled' => 1,
 						'redirects' => $rewrite_rules,
+						'errordocs' => $errordocs,
 						'port' => 443,
 						'apache2_port' => 82
 					);
@@ -602,6 +611,7 @@ class nginx_reverse_proxy_plugin {
 						'http_to_https' => 0,
 						'rewrite_enabled' => 0,
 						'redirects' => '',
+						'errordocs' => $errordocs,
 						'port' => 443,
 						'apache2_port' => 82
 					);
@@ -622,7 +632,7 @@ class nginx_reverse_proxy_plugin {
 			 * We have collected all data in the $vhost_data array
 			 * so we can pass it to the template engine
 			 */
-			$tpl->setVar('cp_base_url', 'https://cp.rackster.ch:8080');
+			$tpl->setVar('cp_base_url', 'https://cp.rackster.ch');
 			$tpl->setVar($vhost_data);
 
 
