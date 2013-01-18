@@ -632,7 +632,7 @@ class nginx_reverse_proxy_plugin {
 			 * We have collected all data in the $vhost_data array
 			 * so we can pass it to the template engine
 			 */
-			$tpl->setVar('cp_base_url', 'https://cp.rackster.ch');
+			$tpl->setVar('cp_base_url', 'https://cp.rackster.ch:8080');
 			$tpl->setVar($vhost_data);
 
 
