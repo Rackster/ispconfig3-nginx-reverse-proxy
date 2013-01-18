@@ -71,26 +71,30 @@ server {
 	## Locations configuration
 	######################################################################
 
+	# alias to local error docs
 	<tmpl_if name='errordocs'>
 		location ^~ /error {
 			root /var/www;
 		}
 	</tmpl_if>
 
-	location ~ /\. {
+	# disallow dotfile access
+	location ^~ /\. {
 		deny all;
 		return 404;
 	}
 
+	# default location
 	location / {
-		include /etc/nginx/naxsi/default.rules;
+		#include /etc/nginx/naxsi/default.rules;
+		include /etc/nginx/conf.d/proxy.conf;
 
 		proxy_cache nginx_cache;
 		proxy_pass http://127.0.0.1:<tmpl_var name='apache2_port'>;
 
 	}
 
-	# naxsi
+	# naxsi cellar
 	location /blocked {
 		return 403;
 		#proxy_pass http://127.0.0.1:4242; # learning mode
