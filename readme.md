@@ -1,26 +1,37 @@
-#ISPConfig3 - nginx Reverse Proxy Plugin
+# ISPConfig3 - nginx Reverse Proxy Plugin
 
 This plugin allows you to run nginx in front of apache2 as a reverse proxy on servers managed through the ISPConfig3 Control Panel.
 
 
-##How it works
+## How it works
 
 In general, it just creates the nginx vhost files for your sites.
 
 Afterwards, all requests to port 80 or 443 (default http(s) ports) are fetched by nginx rather than apache2 and passed to the apache2 backend - with nginx's built-in *proxy_pass* feature.
 
 
-##How to install
+## How to install
 
 Please refer to the wiki which can be found here: [Wiki](https://github.com/Rackster/ispconfig3-nginx-reverse-proxy/wiki)
 
 
-##Contribution
+## Contribution
 
 Feel free to be an active part of the project, either by testing and creating issues or forking and sending pull requests.
 
 
-##Disclaimer
+## Disclaimer
 
 I am in no way responsible for any damage caused to your system by using the plugin.
 Usage at you own risk!
+
+
+## Donation
+
+<form action="https://www.paypal.com/cgi-bin/webscr" method="post">
+<input type="hidden" name="cmd" value="_s-xclick">
+<input type="hidden" name="encrypted" value="-----BEGIN PKCS7-----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-----END PKCS7-----
+">
+<input type="image" src="https://www.paypalobjects.com/de_DE/CH/i/btn/btn_donate_SM.gif" border="0" name="submit" alt="Jetzt einfach, schnell und sicher online bezahlen – mit PayPal.">
+<img alt="" border="0" src="https://www.paypalobjects.com/de_DE/i/scr/pixel.gif" width="1" height="1">
+</form>
