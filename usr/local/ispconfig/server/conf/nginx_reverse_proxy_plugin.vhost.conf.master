@@ -5,7 +5,7 @@ server {
 	## Server configuration
 	######################################################################
 
-	listen <tmpl_var name='ip_address'>:<tmpl_var name='port'>;
+	listen <tmpl_var name='ip_address'>:<tmpl_var name='port'><tmpl_if name='ssl_enabled'> ssl</tmpl_if>;
 	<tmpl_if name='ipv6_enabled'>
 		listen [<tmpl_var name='ipv6_address'>]:<tmpl_var name='port'> ipv6only=on;
 	</tmpl_if>
@@ -21,10 +21,9 @@ server {
 
 	<tmpl_if name='ssl_enabled'>
 		######################################################################
-		## SSL configuration
+		## SSL certificate
 		######################################################################
 
-		ssl on;
 		ssl_certificate <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.crt;
 		ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.key;
 	</tmpl_if>
