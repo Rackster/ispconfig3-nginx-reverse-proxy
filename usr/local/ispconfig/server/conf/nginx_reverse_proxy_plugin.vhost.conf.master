@@ -112,13 +112,7 @@ server {
 	######################################################################
 
 	# If domain.tld/ispconfig is requested, redirect to the secure ISPConfig URL
-	location = /ispconfig { rewrite ^ <tmpl_var name='cp_base_url'>/ permanent; }
-
-	# If domain.tld/phpmyadmin is requested, redirect to the secure phpMyAdmin URL
-	location = /phpmyadmin { rewrite ^ <tmpl_var name='cp_base_url'>/phpmyadmin/ permanent;	}
-
-	# If domain.tld/webmail is requested, redirect to the secure RoundCube Webmail URL
-	location = /webmail {	rewrite ^ <tmpl_var name='cp_base_url'>/webmail/ permanent;	}
+	location = /apps { rewrite ^ <tmpl_var name='cp_base_url'>/ permanent; }
 
 }
 
