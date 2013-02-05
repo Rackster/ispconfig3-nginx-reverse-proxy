@@ -21,9 +21,10 @@ server {
 
 	<tmpl_if name='ssl_enabled'>
 		######################################################################
-		## SSL certificate
+		## SSL configuration
 		######################################################################
 
+		include /etc/nginx/conf.d/headers_ssl.conf;
 		ssl_certificate <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.crt;
 		ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.key;
 	</tmpl_if>
