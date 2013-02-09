@@ -24,7 +24,7 @@ server {
 		## SSL configuration
 		######################################################################
 
-		add_header Strict-Transport-Security max-age=15768000;
+		more_set_headers 'Strict-Transport-Security: max-age=15768000';
 		ssl_certificate <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.crt;
 		ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.key;
 	</tmpl_if>
