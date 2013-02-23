@@ -10,6 +10,7 @@ class nginx_reverse_proxy_plugin {
 	 * private variables
 	 */
 	var $action = '';
+	var $ssl_certificate_changed = false;
 
 
 	/*
@@ -136,19 +137,19 @@ class nginx_reverse_proxy_plugin {
 	 * has to be created in /usr/local/ispconfig/server/plugins-enabled
 	 *
 	 */
-	function onInstall() {
-		global $conf;
+	/*function onInstall() {
+		global $conf;*/
 
 		/*
 		 * The check ifself
 		 */
-		if ($conf['services']['nginx_reverse_proxy_plugin'] == true) {
+		/*if ($conf['services']['nginx_reverse_proxy_plugin'] == true) {
 			return true;
 		} else {
 			return false;
 		}
 
-	}
+	}*/
 
 
 	/*
@@ -180,6 +181,11 @@ class nginx_reverse_proxy_plugin {
 	 */
 	function ssl($event_name, $data) {
 		global $app, $conf;
+
+		$app->uses('system');
+
+		//* Only vhosts can have a ssl cert
+		if($data["new"]["type"] != "vhost" && $data["new"]["type"] != "vhostsubdomain") return;
 
 		/*
 		 * check if we have to delete the ssl files
@@ -272,9 +278,9 @@ class nginx_reverse_proxy_plugin {
 		/*
 		 * To have a better overview we split our update function into several parts,
 		 * for sites, aliases and subdomains
-		 * -> vhost
+		 * -> vhost || vhostsubdomain
 		 */
-		if ($data['new']['type'] == 'vhost') {
+		if ($data['new']['type'] == 'vhost' || $data['new']['type'] == 'vhostsubdomain') {
 
 			/*
 			 * Enable IPv6 support if we have an IP there
@@ -306,7 +312,7 @@ class nginx_reverse_proxy_plugin {
 			 */
 			$alias_result = array();
 
-			$alias_result = $app->dbmaster->queryAllRecords('SELECT domain, subdomain FROM web_domain WHERE parent_domain_id = '. $data['new']['parent_domain_id'] .' AND parent_domain_id > 0 AND active = "y"');
+			$alias_result = $app->dbmaster->queryAllRecords('SELECT * FROM web_domain WHERE parent_domain_id = '.$data['new']['domain_id']." AND active = 'y' AND type != 'vhostsubdomain'");
 
 			if (count($alias_result) > 0) {
 
@@ -661,6 +667,14 @@ class nginx_reverse_proxy_plugin {
 		/*
 		 * To have a better overview we split our update function into several parts,
 		 * for sites, aliases and subdomains
+		 * -> vhost
+		 */
+		if ($data['new']['type'] == 'vhostsubdomain') {}
+
+
+		/*
+		 * To have a better overview we split our update function into several parts,
+		 * for sites, aliases and subdomains
 		 * -> alias
 		 */
 		if ($data['new']['type'] == 'alias') {
@@ -756,7 +770,7 @@ class nginx_reverse_proxy_plugin {
 		 * We just have to delete the vhost file and link
 		 * if we deleted a vhost site
 		 */
-		if ($data['old']['type'] == 'vhost') $this->vhost('delete', $data);
+		if ($data['old']['type'] == 'vhost' || $data['old']['type'] == 'vhostsubdomain') $this->vhost('delete', $data);
 
 
 		/*
