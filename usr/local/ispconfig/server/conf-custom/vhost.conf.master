@@ -12,7 +12,11 @@
 			<tmpl_if name='php' op='==' value='cgi'>
 				DocumentRoot <tmpl_var name='web_document_root'>
 			</tmpl_else>
-				DocumentRoot <tmpl_var name='web_document_root_www'>
+				<tmpl_if name='php' op='==' value='php-fpm'>
+					DocumentRoot <tmpl_var name='web_document_root'>
+				</tmpl_else>
+					DocumentRoot <tmpl_var name='web_document_root_www'>
+				</tmpl_if>
 			</tmpl_if>
 		</tmpl_if>
 
