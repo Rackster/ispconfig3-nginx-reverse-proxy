@@ -5,10 +5,18 @@ server {
 	## Server configuration
 	######################################################################
 
-	listen <tmpl_var name='ip_address'>:<tmpl_var name='port'><tmpl_if name='ssl_enabled'> ssl</tmpl_if>;
-	<tmpl_if name='ipv6_enabled'>
-		listen [<tmpl_var name='ipv6_address'>]:<tmpl_var name='port'> ipv6only=on;
+	<tmpl_if name='ssl_enabled'>
+		listen <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'>:</tmpl_if>443 ssl;
+		<tmpl_if name='ipv6_enabled'>
+			listen [::]:443 ipv6only=on ssl;
+		</tmpl_if>
+	</tmpl_else>
+		listen <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'>:</tmpl_if>80;
+		<tmpl_if name='ipv6_enabled'>
+			listen [::]:80 ipv6only=on;
+		</tmpl_if>
 	</tmpl_if>
+
 	server_name <tmpl_var name='domain'> <tmpl_if name='alias'><tmpl_var name='alias'></tmpl_if> <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'></tmpl_if>;
 
 	root <tmpl_var name='web_document_root_www'>;
@@ -86,26 +94,15 @@ server {
 
 	# default location
 	location / {
-		#include /etc/nginx/naxsi/default.rules;
-
 		proxy_cache nginx_cache;
 		proxy_pass http://127.0.0.1:<tmpl_var name='apache2_port'>;
-
 	}
-
-	# naxsi cellar
-	location /blocked {
-		return 403;
-		#proxy_pass http://127.0.0.1:4242; # learning mode
-   	}
 
 	######################################################################
 	## Directives configuration
 	######################################################################
 
-	<tmpl_loop name="nginx_directives">
-		<tmpl_var name='nginx_directive'>
-	</tmpl_loop>
+	<tmpl_var name='nginx_directives'>
 
 	######################################################################
 	## CP configuration

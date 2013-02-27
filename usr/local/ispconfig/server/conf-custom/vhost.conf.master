@@ -12,7 +12,11 @@
 			<tmpl_if name='php' op='==' value='cgi'>
 				DocumentRoot <tmpl_var name='web_document_root'>
 			</tmpl_else>
-				DocumentRoot <tmpl_var name='web_document_root_www'>
+				<tmpl_if name='php' op='==' value='php-fpm'>
+					DocumentRoot <tmpl_var name='web_document_root'>
+				</tmpl_else>
+					DocumentRoot <tmpl_var name='web_document_root_www'>
+				</tmpl_if>
 			</tmpl_if>
 		</tmpl_if>
 
@@ -120,6 +124,21 @@
 					SetHandler ruby-object
 					RubyHandler Apache::RubyRun.instance
 				</Files>
+			</IfModule>
+		</tmpl_if>
+
+		<tmpl_if name='perl' op='==' value='y'>
+			<IfModule mod_perl.c>
+				PerlModule ModPerl::Registry
+				PerlModule Apache2::Reload
+				<Directory {tmpl_var name='web_document_root_www'}>
+					PerlResponseHandler ModPerl::Registry
+					PerlOptions +ParseHeaders
+					Options +ExecCGI
+				</Directory>
+            	<Files *.pl>
+					SetHandler perl-script
+            	</Files>
 			</IfModule>
 		</tmpl_if>
 
@@ -244,18 +263,41 @@
 			</Directory>
 		</tmpl_if>
 
+		<tmpl_if name='php' op='==' value='php-fpm'>
+			<IfModule mod_fastcgi.c>
+				<Directory {tmpl_var name='document_root'}/cgi-bin>
+					Order allow,deny
+					Allow from all
+			    </Directory>
+                AddHandler php5-fcgi .php
+                Action php5-fcgi /php5-fcgi
+				Alias /php5-fcgi {tmpl_var name='document_root'}/cgi-bin/php5-fcgi-{tmpl_var name='ip_address'}-{tmpl_var name='port'}-{tmpl_var name='domain'}
+				<tmpl_if name='use_tcp'>
+                	FastCgiExternalServer {tmpl_var name='document_root'}/cgi-bin/php5-fcgi-{tmpl_var name='ip_address'}-{tmpl_var name='port'}-{tmpl_var name='domain'} -host 127.0.0.1:<tmpl_var name='fpm_port'> -pass-header Authorization
+				</tmpl_if>
+				<tmpl_if name='use_socket'>
+                	FastCgiExternalServer {tmpl_var name='document_root'}/cgi-bin/php5-fcgi-{tmpl_var name='ip_address'}-{tmpl_var name='port'}-{tmpl_var name='domain'} -socket <tmpl_var name='fpm_socket'> -pass-header Authorization
+				</tmpl_if>
+			</IfModule>
+		</tmpl_if>
+
 		<tmpl_if name="rewrite_enabled">
 			RewriteEngine on
-
 			<tmpl_if name='seo_redirect_enabled'>
-				RewriteCond %{HTTP_HOST} ^<tmpl_var name='seo_redirect_origin_domain'>$ [NC]
+				RewriteCond %{HTTP_HOST} <tmpl_var name='seo_redirect_operator'>^<tmpl_var name='seo_redirect_origin_domain'>$ [NC]
 				RewriteRule ^(.*)$ http://<tmpl_var name='seo_redirect_target_domain'>$1 [R=301,L]
 			</tmpl_if>
-
+			<tmpl_loop name="alias_seo_redirects">
+				RewriteCond %{HTTP_HOST} <tmpl_var name='alias_seo_redirect_operator'>^<tmpl_var name='alias_seo_redirect_origin_domain'>$ [NC]
+				RewriteRule ^(.*)$ http://<tmpl_var name='alias_seo_redirect_target_domain'>$1 [R=301,L]
+			</tmpl_loop>
 			<tmpl_loop name="redirects">
 				RewriteCond %{HTTP_HOST}   <tmpl_var name='rewrite_domain'>$ [NC]
-				RewriteCond %{REQUEST_URI} !^/webdav/
-				RewriteRule   ^/(.*)$ <tmpl_var name='rewrite_target'>$1  <tmpl_var name='rewrite_type'>
+				<tmpl_if name="rewrite_is_url" op="==" value="n">
+					RewriteCond %{REQUEST_URI} !^/webdav/
+					RewriteCond %{REQUEST_URI} !^<tmpl_var name='rewrite_target'>
+				</tmpl_if>
+				RewriteRule   ^/(.*)$ <tmpl_var name='rewrite_target'><tmpl_if name="rewrite_add_path" op="==" value="y">$1</tmpl_if>  <tmpl_var name='rewrite_type'>
 			</tmpl_loop>
 		</tmpl_if>
 
