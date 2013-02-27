@@ -504,7 +504,6 @@ class nginx_reverse_proxy_plugin {
 			 * Custom nginx directives from the
 			 * ISPConfig field
 			 */
-			$final_nginx_directives = array();
 			$nginx_directives = $data['new']['nginx_directives'];
 
 
@@ -519,19 +518,7 @@ class nginx_reverse_proxy_plugin {
 			 */
 			$nginx_directives = str_replace("\r\n", "\n", $nginx_directives);
 			$nginx_directives = str_replace("\r", "\n", $nginx_directives);
-			$nginx_directive_lines = explode("\n", $nginx_directives);
-
-			if (is_array($nginx_directive_lines) && !empty($nginx_directive_lines)) {
-
-				foreach($nginx_directive_lines as $nginx_directive_line) {
-
-					$final_nginx_directives[] = array('nginx_directive' => $nginx_directive_line);
-
-				}
-
-			}
-
-			$tpl->setLoop('nginx_directives', $final_nginx_directives);
+			//$nginx_directive_lines = explode("\n", $nginx_directives);
 
 			/*
 			 * Check if the site is SSL enabled
@@ -561,6 +548,7 @@ class nginx_reverse_proxy_plugin {
 					'http_to_https' => $http_to_https,
 					'rewrite_enabled' => 1,
 					'redirects' => $rewrite_rules,
+					'nginx_directives' => $nginx_directives,
 					'errordocs' => $errordocs,
 					'port' => 80,
 					'apache2_port' => 82
@@ -575,6 +563,7 @@ class nginx_reverse_proxy_plugin {
 					'http_to_https' => $http_to_https,
 					'rewrite_enabled' => 0,
 					'redirects' => '',
+					'nginx_directives' => $nginx_directives,
 					'errordocs' => $errordocs,
 					'port' => 80,
 					'apache2_port' => 82
@@ -603,6 +592,7 @@ class nginx_reverse_proxy_plugin {
 						'http_to_https' => 0,
 						'rewrite_enabled' => 1,
 						'redirects' => $rewrite_rules,
+						'nginx_directives' => $nginx_directives,
 						'errordocs' => $errordocs,
 						'port' => 443,
 						'apache2_port' => 82
@@ -617,6 +607,7 @@ class nginx_reverse_proxy_plugin {
 						'http_to_https' => 0,
 						'rewrite_enabled' => 0,
 						'redirects' => '',
+						'nginx_directives' => $nginx_directives,
 						'errordocs' => $errordocs,
 						'port' => 443,
 						'apache2_port' => 82
