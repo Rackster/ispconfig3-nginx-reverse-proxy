@@ -64,7 +64,6 @@ class nginx_reverse_proxy_plugin {
 		/*
 		 * require the vhost class and run the function
 		 */
-		require_once '../plugins-classes/vhost.php';
 		$vhost = new vhost;
 
 		return $data['vhost'] = $vhost->$action($data, $app, $tpl);
@@ -123,7 +122,6 @@ class nginx_reverse_proxy_plugin {
 		/*
 		 * require the vhost class and run the function
 		 */
-		require_once '../plugins-classes/cert.php';
 		$cert = new cert;
 
 		return $data['cert'] = $cert->$action($data, $app, $suffix);
@@ -847,6 +845,231 @@ class nginx_reverse_proxy_plugin {
 
 		$app->log('exec: '. $command, LOGLEVEL_DEBUG);
 		exec($command);
+
+	}
+
+}
+
+
+
+class cert {
+
+	/*
+	 * the insert function creates the ssl cert files
+	 */
+	function insert($data, $app, $suffix) {
+
+		/*
+		 * we can only proceed if openssl did create
+		 * the crt and key file
+		 */
+		if ($data['cert']['crt_check'] == 1 && $data['cert']['key_check'] == 1) {
+
+			/*
+			 * create the bundled cert file if we have a bundle
+			 */
+			if ($data['cert']['bundle_check'] == 1) {
+
+				/*
+				 * create an empty file to ensure newline between the .crt and .bundle
+				 */
+				exec('echo "" > /tmp/ispconfig3_newline_fix');
+
+
+				/*
+				 * merge the .crt and .bundle files
+				 */
+				exec('cat '. $data['cert']['crt'] .' /tmp/ispconfig3_newline_fix '. $data['cert']['bundle'] .' > '. $data['cert'][$suffix .'_crt']);
+				$app->log('Merging ssl cert and bundle file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
+
+
+				/*
+				 * remove the file we created to fix the newline
+				 */
+				exec('rm /tmp/ispconfig3_newline_fix');
+
+			} else {
+
+				/*
+				 * copy the .crt file
+				 */
+				exec('cp '. $data['cert']['crt'] .' '. $data['cert'][$suffix .'_crt']);
+				$app->log('Copying ssl cert file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
+
+			}
+
+
+			/*
+			 * copy the secrect .key file
+			 */
+			exec('cp '. $data['cert']['key'] .' '. $data['cert'][$suffix .'_key']);
+			$app->log('Copying ssl key file: '. $data['cert'][$suffix .'_key'], LOGLEVEL_DEBUG);
+
+		} else {
+
+			/*
+			 * Report an error
+			 */
+			$app->log('Creating '. $suffix .' ssl files failed', LOGLEVEL_DEBUG);
+
+		}
+
+	}
+
+
+	/*
+	 * the update function changes the ssl cert files
+	 */
+	function update($data, $app, $suffix) {
+
+		/*
+		 * We make it really simple and remove all files
+		 * so we can re-'create' them
+		 */
+		$this->delete($data, $app, $suffix);
+		$this->insert($data, $app, $suffix);
+
+	}
+
+
+	/*
+	 * the delete function removes the ssl cert files
+	 */
+	function delete($data, $app, $suffix) {
+
+		/*
+		 * check if the crt file exists and remove if it does
+		 */
+		if ($data['cert'][$suffix .'_crt_check'] == 1) {
+
+			unlink($data['cert']['nginx_crt']);
+			$app->log('Removing ssl cert file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
+
+		}
+
+
+		/*
+		 * check if the key file exists and remove if it does
+		 */
+		if ($data['cert'][$suffix .'_key_check'] == 1) {
+
+			unlink($data['cert'][$suffix .'_key']);
+			$app->log('Removing ssl key file: '. $data['cert'][$suffix. '_key'], LOGLEVEL_DEBUG);
+
+		}
+
+	}
+
+}
+
+
+
+class vhost {
+
+	/*
+	 * the insert function creates the vhost file and link
+	 */
+	function insert($data, $app, $tpl) {
+
+		/*
+		 * the vhost file doesn't exist so we have to create it
+		 * and write the template content
+		 */
+		file_put_contents($data['vhost']['file_new'], $tpl);
+		$data['vhost']['file_new_check'] = 1;
+		$app->log('Creating vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
+		unset($tpl);
+
+		if ($data['vhost']['link_new_check'] != 1) {
+
+			/*
+			 * the vhost link doesn't exist so we have to create it
+			 */
+			exec('ln -s '. $data['vhost']['file_new'] .' '. $data['vhost']['link_new']);
+			$data['vhost']['link_new_check'] = 1;
+			$app->log('Creating vhost symlink: '. $data['vhost']['link_new_check'], LOGLEVEL_DEBUG);
+
+		}
+
+
+		/*
+		 * return the $data['vhost'] array
+		 */
+		return $data['vhost'];
+
+	}
+
+
+	/*
+	 * the update function updates the vhost file and link
+	 */
+	function update($data, $app, $tpl) {
+
+		/*
+		 * fix remove of sites-enabled if site
+		 * gets an update
+		 */
+		$data['vhost']['link_new_check'] = 0;
+
+
+		/*
+		 * check if the site is no longer active
+		 */
+		if ($data['new']['active'] == 'n') {
+
+			/*
+			 * it's not longer active, so we have to tell
+			 * the delete function to NOT delete the vhost file
+			 * and the insert function, to NOT create the vhost link
+			 */
+			$data['vhost']['link_new_check'] = 1;
+
+		}
+
+
+		/*
+		 * create a backup of the vhost file
+		 */
+		exec('mv '. $data['vhost']['file_new'] .' '. $data['vhost']['file_new'] .'~');
+		$data['vhost']['file_new_check'] = 0;
+		$data['vhost']['file_old_check'] = 0;
+
+
+		/*
+		 * The site was renamed, so we have to delete the old vhost and create the new
+		 */
+		$this->delete($data, $app);
+		return $this->insert($data, $app, $tpl);
+
+	}
+
+
+	/*
+	 * the delete function deletes the vhost file and link
+	 */
+	function delete($data, $app, $tpl = '') {
+
+		if ($data['vhost']['file_old_check'] == 1) {
+
+			/*
+			 * the vhost file exists so we have to delete it
+			 */
+			unlink($data['vhost']['file_old']);
+			$data['vhost']['file_old_check'] = 0;
+			$app->log('Removing vhost file: '. $data['vhost']['file_old'], LOGLEVEL_DEBUG);
+
+		}
+
+		if ($data['vhost']['link_old_check'] == 1) {
+
+			/*
+			 * the vhost link exists so we have to delete it
+			 */
+			unlink($data['vhost']['link_old']);
+			$data['vhost']['link_old_check'] = 0;
+			$app->log('Removing vhost symlink: '. $data['vhost']['link_old'], LOGLEVEL_DEBUG);
+
+		}
 
 	}
 
