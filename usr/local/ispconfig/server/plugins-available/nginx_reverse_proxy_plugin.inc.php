@@ -64,7 +64,7 @@ class nginx_reverse_proxy_plugin {
 		/*
 		 * require the vhost class and run the function
 		 */
-		require_once 'classes/vhost.php';
+		require_once '../plugins-classes/vhost.php';
 		$vhost = new vhost;
 
 		return $data['vhost'] = $vhost->$action($data, $app, $tpl);
@@ -123,7 +123,7 @@ class nginx_reverse_proxy_plugin {
 		/*
 		 * require the vhost class and run the function
 		 */
-		require_once 'classes/cert.php';
+		require_once '../plugins-classes/cert.php';
 		$cert = new cert;
 
 		return $data['cert'] = $cert->$action($data, $app, $suffix);
