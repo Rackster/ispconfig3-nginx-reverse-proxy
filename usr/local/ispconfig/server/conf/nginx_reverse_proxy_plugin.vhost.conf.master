@@ -6,9 +6,9 @@ server {
 	######################################################################
 
 	<tmpl_if name='ssl_enabled'>
-		listen <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'>:</tmpl_if>443 ssl;
+		listen <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'>:</tmpl_if>443 ssl spdy;
 		<tmpl_if name='ipv6_enabled'>
-			listen [::]:443 ipv6only=on ssl;
+			listen [::]:443 ipv6only=on ssl spdy;
 		</tmpl_if>
 	</tmpl_else>
 		listen <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'>:</tmpl_if>80;
