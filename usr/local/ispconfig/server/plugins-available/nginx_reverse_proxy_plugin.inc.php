@@ -60,13 +60,8 @@ class nginx_reverse_proxy_plugin {
 		if (is_link($data['vhost']['link_old'])) $data['vhost']['link_old_check'] = 1;
 		if (is_link($data['vhost']['link_new'])) $data['vhost']['link_new_check'] = 1;
 
-
-		/*
-		 * require the vhost class and run the function
-		 */
-		$vhost = new vhost;
-
-		return $data['vhost'] = $vhost->$action($data, $app, $tpl);
+		$method = "vhost_$action";
+		return $data['vhost'] = $this->$method{action}($data, $app, $tpl);
 
 	}
 
@@ -118,13 +113,8 @@ class nginx_reverse_proxy_plugin {
 		 */
 		if (is_file($data['cert']['bundle'])) $data['cert']['bundle_check'] = 1;
 
-
-		/*
-		 * require the vhost class and run the function
-		 */
-		$cert = new cert;
-
-		return $data['cert'] = $cert->$action($data, $app, $suffix);
+		$method = "cert_$action";
+		return $data['cert'] = $this->$method($data, $app, $suffix);
 
 	}
 
@@ -848,16 +838,119 @@ class nginx_reverse_proxy_plugin {
 
 	}
 
-}
+
+	/*
+	 * the insert function creates the vhost file and link
+	 */
+	function vhost_insert($data, $app, $tpl) {
+
+		/*
+		 * the vhost file doesn't exist so we have to create it
+		 * and write the template content
+		 */
+		file_put_contents($data['vhost']['file_new'], $tpl);
+		$data['vhost']['file_new_check'] = 1;
+		$app->log('Creating vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
+		unset($tpl);
+
+		if ($data['vhost']['link_new_check'] != 1) {
+
+			/*
+			 * the vhost link doesn't exist so we have to create it
+			 */
+			exec('ln -s '. $data['vhost']['file_new'] .' '. $data['vhost']['link_new']);
+			$data['vhost']['link_new_check'] = 1;
+			$app->log('Creating vhost symlink: '. $data['vhost']['link_new_check'], LOGLEVEL_DEBUG);
+
+		}
 
 
+		/*
+		 * return the $data['vhost'] array
+		 */
+		return $data['vhost'];
 
-class cert {
+	}
+
+
+	/*
+	 * the update function updates the vhost file and link
+	 */
+	function vhost_update($data, $app, $tpl) {
+
+		/*
+		 * fix remove of sites-enabled if site
+		 * gets an update
+		 */
+		$data['vhost']['link_new_check'] = 0;
+
+
+		/*
+		 * check if the site is no longer active
+		 */
+		if ($data['new']['active'] == 'n') {
+
+			/*
+			 * it's not longer active, so we have to tell
+			 * the delete function to NOT delete the vhost file
+			 * and the insert function, to NOT create the vhost link
+			 */
+			$data['vhost']['link_new_check'] = 1;
+
+		}
+
+
+		/*
+		 * create a backup of the vhost file
+		 */
+		exec('mv '. $data['vhost']['file_new'] .' '. $data['vhost']['file_new'] .'~');
+		$data['vhost']['file_new_check'] = 0;
+		$data['vhost']['file_old_check'] = 0;
+
+
+		/*
+		 * The site was renamed, so we have to delete the old vhost and create the new
+		 */
+		$this->vhost_delete($data, $app);
+		return $this->vhost_insert($data, $app, $tpl);
+
+	}
+
+
+	/*
+	 * the delete function deletes the vhost file and link
+	 */
+	function vhost_delete($data, $app, $tpl = '') {
+
+		if ($data['vhost']['file_old_check'] == 1) {
+
+			/*
+			 * the vhost file exists so we have to delete it
+			 */
+			unlink($data['vhost']['file_old']);
+			$data['vhost']['file_old_check'] = 0;
+			$app->log('Removing vhost file: '. $data['vhost']['file_old'], LOGLEVEL_DEBUG);
+
+		}
+
+		if ($data['vhost']['link_old_check'] == 1) {
+
+			/*
+			 * the vhost link exists so we have to delete it
+			 */
+			unlink($data['vhost']['link_old']);
+			$data['vhost']['link_old_check'] = 0;
+			$app->log('Removing vhost symlink: '. $data['vhost']['link_old'], LOGLEVEL_DEBUG);
+
+		}
+
+	}
+
 
 	/*
 	 * the insert function creates the ssl cert files
 	 */
-	function insert($data, $app, $suffix) {
+	function cert_insert($data, $app, $suffix) {
 
 		/*
 		 * we can only proceed if openssl did create
@@ -920,14 +1013,14 @@ class cert {
 	/*
 	 * the update function changes the ssl cert files
 	 */
-	function update($data, $app, $suffix) {
+	function cert_update($data, $app, $suffix) {
 
 		/*
 		 * We make it really simple and remove all files
 		 * so we can re-'create' them
 		 */
-		$this->delete($data, $app, $suffix);
-		$this->insert($data, $app, $suffix);
+		$this->cert_delete($data, $app, $suffix);
+		$this->cert_insert($data, $app, $suffix);
 
 	}
 
@@ -935,7 +1028,7 @@ class cert {
 	/*
 	 * the delete function removes the ssl cert files
 	 */
-	function delete($data, $app, $suffix) {
+	function cert_delete($data, $app, $suffix) {
 
 		/*
 		 * check if the crt file exists and remove if it does
@@ -955,119 +1048,6 @@ class cert {
 
 			unlink($data['cert'][$suffix .'_key']);
 			$app->log('Removing ssl key file: '. $data['cert'][$suffix. '_key'], LOGLEVEL_DEBUG);
-
-		}
-
-	}
-
-}
-
-
-
-class vhost {
-
-	/*
-	 * the insert function creates the vhost file and link
-	 */
-	function insert($data, $app, $tpl) {
-
-		/*
-		 * the vhost file doesn't exist so we have to create it
-		 * and write the template content
-		 */
-		file_put_contents($data['vhost']['file_new'], $tpl);
-		$data['vhost']['file_new_check'] = 1;
-		$app->log('Creating vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
-		unset($tpl);
-
-		if ($data['vhost']['link_new_check'] != 1) {
-
-			/*
-			 * the vhost link doesn't exist so we have to create it
-			 */
-			exec('ln -s '. $data['vhost']['file_new'] .' '. $data['vhost']['link_new']);
-			$data['vhost']['link_new_check'] = 1;
-			$app->log('Creating vhost symlink: '. $data['vhost']['link_new_check'], LOGLEVEL_DEBUG);
-
-		}
-
-
-		/*
-		 * return the $data['vhost'] array
-		 */
-		return $data['vhost'];
-
-	}
-
-
-	/*
-	 * the update function updates the vhost file and link
-	 */
-	function update($data, $app, $tpl) {
-
-		/*
-		 * fix remove of sites-enabled if site
-		 * gets an update
-		 */
-		$data['vhost']['link_new_check'] = 0;
-
-
-		/*
-		 * check if the site is no longer active
-		 */
-		if ($data['new']['active'] == 'n') {
-
-			/*
-			 * it's not longer active, so we have to tell
-			 * the delete function to NOT delete the vhost file
-			 * and the insert function, to NOT create the vhost link
-			 */
-			$data['vhost']['link_new_check'] = 1;
-
-		}
-
-
-		/*
-		 * create a backup of the vhost file
-		 */
-		exec('mv '. $data['vhost']['file_new'] .' '. $data['vhost']['file_new'] .'~');
-		$data['vhost']['file_new_check'] = 0;
-		$data['vhost']['file_old_check'] = 0;
-
-
-		/*
-		 * The site was renamed, so we have to delete the old vhost and create the new
-		 */
-		$this->delete($data, $app);
-		return $this->insert($data, $app, $tpl);
-
-	}
-
-
-	/*
-	 * the delete function deletes the vhost file and link
-	 */
-	function delete($data, $app, $tpl = '') {
-
-		if ($data['vhost']['file_old_check'] == 1) {
-
-			/*
-			 * the vhost file exists so we have to delete it
-			 */
-			unlink($data['vhost']['file_old']);
-			$data['vhost']['file_old_check'] = 0;
-			$app->log('Removing vhost file: '. $data['vhost']['file_old'], LOGLEVEL_DEBUG);
-
-		}
-
-		if ($data['vhost']['link_old_check'] == 1) {
-
-			/*
-			 * the vhost link exists so we have to delete it
-			 */
-			unlink($data['vhost']['link_old']);
-			$data['vhost']['link_old_check'] = 0;
-			$app->log('Removing vhost symlink: '. $data['vhost']['link_old'], LOGLEVEL_DEBUG);
 
 		}
 
