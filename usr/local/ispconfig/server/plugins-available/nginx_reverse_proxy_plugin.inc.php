@@ -1,16 +1,20 @@
 <?php
 
-class nginx_reverse_proxy_plugin {
+class nginx_reverse_proxy_plugin
+{
 
 	var $plugin_name = 'nginx_reverse_proxy_plugin';
 	var $class_name = 'nginx_reverse_proxy_plugin';
-
 
 	var $action = '';
 	var $ssl_certificate_changed = false;
 
 
-	function vhost($action, $data, $tpl = '')
+	/*/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// # VHOST FUNCTION
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+	private function vhost($action, $data, $tpl = '')
 	{
 		global $app;
 
@@ -34,7 +38,11 @@ class nginx_reverse_proxy_plugin {
 	}
 
 
-	function cert($action, $data)
+	/*/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// # CERT FUNCTION
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+	private function cert($action, $data)
 	{
 		global $app;
 
@@ -59,6 +67,10 @@ class nginx_reverse_proxy_plugin {
 		return $data['cert'] = $this->$method($data, $app, $suffix);
 	}
 
+
+	/*/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// # ISPCONFIG FUNCTIONS
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 
 	function onLoad()
 	{
@@ -469,7 +481,11 @@ class nginx_reverse_proxy_plugin {
 	}
 
 
-	function vhost_insert($data, $app, $tpl)
+	/*/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// # VHOST FUNCTIONS
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+	private function vhost_insert($data, $app, $tpl)
 	{
 		file_put_contents($data['vhost']['file_new'], $tpl);
 		$data['vhost']['file_new_check'] = 1;
@@ -487,7 +503,7 @@ class nginx_reverse_proxy_plugin {
 	}
 
 
-	function vhost_update($data, $app, $tpl)
+	private function vhost_update($data, $app, $tpl)
 	{
 		$data['vhost']['link_new_check'] = 0;
 
@@ -505,7 +521,7 @@ class nginx_reverse_proxy_plugin {
 	}
 
 
-	function vhost_delete($data, $app, $tpl = '')
+	private function vhost_delete($data, $app, $tpl = '')
 	{
 		if ($data['vhost']['file_old_check'] == 1)
 		{
@@ -523,7 +539,11 @@ class nginx_reverse_proxy_plugin {
 	}
 
 
-	function cert_insert($data, $app, $suffix)
+	/*/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// # CERT FUNCTIONS
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+	private function cert_insert($data, $app, $suffix)
 	{
 		if ($data['cert']['crt_check'] == 1 && $data['cert']['key_check'] == 1)
 		{
@@ -552,14 +572,14 @@ class nginx_reverse_proxy_plugin {
 	}
 
 
-	function cert_update($data, $app, $suffix)
+	private function cert_update($data, $app, $suffix)
 	{
 		$this->cert_delete($data, $app, $suffix);
 		$this->cert_insert($data, $app, $suffix);
 	}
 
 
-	function cert_delete($data, $app, $suffix)
+	private function cert_delete($data, $app, $suffix)
 	{
 		if ($data['cert'][$suffix .'_crt_check'] == 1)
 		{
