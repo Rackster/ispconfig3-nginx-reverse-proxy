@@ -51,7 +51,7 @@ class nginx_reverse_proxy_plugin
 		}
 		else
 		{
-			$this->cert_heper('update', $data);
+			$this->cert_helper('update', $data);
 		}
 	}
 
@@ -88,9 +88,19 @@ class nginx_reverse_proxy_plugin
 		$tpl = new tpl();
 		$tpl->newTemplate('nginx_reverse_proxy_plugin.vhost.conf.master');
 
+		$web_folder = 'web';
+		if($data['new']['type'] == 'vhostsubdomain')
+		{
+            $tmp = $app->db->queryOneRecord('SELECT `domain` FROM web_domain WHERE domain_id = '.intval($data['new']['parent_domain_id']));
+            $subdomain_host = preg_replace('/^(.*)\.' . preg_quote($tmp['domain'], '/') . '$/', '$1', $data['new']['domain']);
+            if($subdomain_host == '') $subdomain_host = 'web'.$data['new']['domain_id'];
+            $web_folder = $data['new']['web_folder'];
+            unset($tmp);
+        }
+
 		$vhost_data = $data['new'];
-		$vhost_data['web_document_root'] = $data['new']['document_root'].'/web';
-		$vhost_data['web_document_root_www'] = $web_config['website_basedir'].'/'.$data['new']['domain'].'/web';
+		$vhost_data['web_document_root'] = $data['new']['document_root'].'/'.$web_folder;
+		$vhost_data['web_document_root_www'] = $web_config['website_basedir'].'/'.$data['new']['domain'].'/'.$web_folder;
 		$vhost_data['web_basedir'] = $web_config['website_basedir'];
 		$vhost_data['ssl_domain'] = $data['new']['ssl_domain'];
 
@@ -472,8 +482,7 @@ class nginx_reverse_proxy_plugin
 		if (is_link($data['vhost']['link_old'])) $data['vhost']['link_old_check'] = 1;
 		if (is_link($data['vhost']['link_new'])) $data['vhost']['link_new_check'] = 1;
 
-		$method = "vhost_$action";
-		return $data['vhost'] = $this->$method($data, $app, $tpl);
+		return $data['vhost'] = call_user_func_array(array($this, $action), array($data, $app, $tpl));
 	}
 
 
@@ -482,7 +491,9 @@ class nginx_reverse_proxy_plugin
 
 	private function vhost_insert($data, $app, $tpl)
 	{
-		file_put_contents($data['vhost']['file_new'], $tpl);
+		$app->uses('system');
+		$app->system->file_put_contents($data['vhost']['file_new'], $tpl);
+
 		$data['vhost']['file_new_check'] = 1;
 		$app->log('Creating vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
 		unset($tpl);
@@ -569,7 +580,7 @@ class nginx_reverse_proxy_plugin
 		if (is_file($data['cert']['bundle'])) $data['cert']['bundle_check'] = 1;
 
 		$method = "cert_$action";
-		return $data['cert'] = $this->$method($data, $app, $suffix);
+		return $data['cert'] = call_user_func_array(array($this, $action), array($data, $app, $suffix));
 	}
 
 
