@@ -11,66 +11,6 @@ class nginx_reverse_proxy_plugin
 
 
 	/*/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// # VHOST FUNCTION
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
-
-	private function vhost($action, $data, $tpl = '')
-	{
-		global $app;
-
-		//* $VAR: location of nginx vhost dirs
-		$nginx_vhosts = '/etc/nginx/sites-available';
-		$nginx_vhosts_enabled = '/etc/nginx/sites-enabled';
-
-		$data['vhost'] = array();
-
-		$data['vhost']['file_old'] = escapeshellcmd($nginx_vhosts .'/'. $data['old']['domain'] .'.vhost');
-		$data['vhost']['link_old'] = escapeshellcmd($nginx_vhosts_enabled .'/'. $data['old']['domain'] .'.vhost');
-		$data['vhost']['file_new'] = escapeshellcmd($nginx_vhosts .'/'. $data['new']['domain'] .'.vhost');
-		$data['vhost']['link_new'] = escapeshellcmd($nginx_vhosts_enabled .'/'. $data['new']['domain'] .'.vhost');
-
-		if (is_file($data['vhost']['file_old'])) $data['vhost']['file_old_check'] = 1;
-		if (is_file($data['vhost']['file_new'])) $data['vhost']['file_new_check'] = 1;
-
-		if (is_link($data['vhost']['link_old'])) $data['vhost']['link_old_check'] = 1;
-		if (is_link($data['vhost']['link_new'])) $data['vhost']['link_new_check'] = 1;
-
-		$method = "vhost_$action";
-		return $data['vhost'] = $this->$method{action}($data, $app, $tpl);
-	}
-
-
-	/*/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// # CERT FUNCTION
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
-
-	private function cert($action, $data)
-	{
-		global $app;
-
-		$data['cert'] = array();
-		$suffix = 'nginx';
-		$ssl_dir = $data['new']['document_root'] .'/ssl';
-
-		$data['cert']['crt'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.crt');
-		$data['cert']['key'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.key');
-		$data['cert']['bundle'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.bundle');
-		$data['cert'][$suffix .'_crt'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.'. $suffix .'.crt');
-		$data['cert'][$suffix .'_key'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.'. $suffix .'.key');
-
-		if (is_file($data['cert']['crt'])) $data['cert']['crt_check'] = 1;
-		if (is_file($data['cert'][$suffix .'_crt'])) $data['cert'][$suffix .'_crt_check'] = 1;
-
-		if (is_file($data['cert']['key'])) $data['cert']['key_check'] = 1;
-		if (is_file($data['cert'][$suffix .'_key'])) $data['cert'][$suffix .'_key_check'] = 1;
-		if (is_file($data['cert']['bundle'])) $data['cert']['bundle_check'] = 1;
-
-		$method = "cert_$action";
-		return $data['cert'] = $this->$method($data, $app, $suffix);
-	}
-
-
-	/*/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// # ISPCONFIG FUNCTIONS
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 
@@ -107,11 +47,11 @@ class nginx_reverse_proxy_plugin
 
 		if ($data['new']['ssl_action'] == 'del')
 		{
-			$this->cert('delete', $data);
+			$this->cert_helper('delete', $data);
 		}
 		else
 		{
-			$this->cert('update', $data);
+			$this->cert_heper('update', $data);
 		}
 	}
 
@@ -154,7 +94,6 @@ class nginx_reverse_proxy_plugin
 		$vhost_data['web_basedir'] = $web_config['website_basedir'];
 		$vhost_data['ssl_domain'] = $data['new']['ssl_domain'];
 
-
 		/* __ VHOST & VHOSTSUBDOMAIN - section for vhosts and vhostsubdomains ///////////////////////////////////////*/
 		if ($data['new']['type'] == 'vhost' || $data['new']['type'] == 'vhostsubdomain')
 		{
@@ -170,7 +109,6 @@ class nginx_reverse_proxy_plugin
 					$server_alias[] .= '*.'. $data['new']['domain'] .' ';
 					break;
 			}
-
 			$alias_result = array();
 			$alias_result = $app->dbmaster->queryAllRecords('SELECT * FROM web_domain WHERE parent_domain_id = '.$data['new']['domain_id']." AND active = 'y' AND type != 'vhostsubdomain'");
 			if (count($alias_result) > 0)
@@ -194,7 +132,6 @@ class nginx_reverse_proxy_plugin
 
 				unset($alias);
 			}
-
 			if (count($server_alias) > 0)
 			{
 				$server_alias_str = '';
@@ -390,17 +327,18 @@ class nginx_reverse_proxy_plugin
 
 			$tpl->setLoop('vhosts', $vhosts);
 
+			//* $VAR: ISPConfig CP URL
 			$tpl->setVar('cp_base_url', 'https://cp.rackster.ch:8081');
 			$tpl->setVar($vhost_data);
 
 			if ($this->action == 'insert')
 			{
-				$this->vhost('insert', $data, $tpl->grab());
+				$this->vhost_helper('insert', $data, $tpl->grab());
 			}
 
 			if ($this->action == 'update')
 			{
-				$vhost_backup = $this->vhost('update', $data, $tpl->grab());
+				$vhost_backup = $this->vhost_helper('update', $data, $tpl->grab());
 			}
 		}
 
@@ -451,7 +389,7 @@ class nginx_reverse_proxy_plugin
 		$app->uses('getconf');
 		$web_config = $app->getconf->get_server_config($conf['server_id'], 'web');
 
-		if ($data['old']['type'] == 'vhost' || $data['old']['type'] == 'vhostsubdomain') $this->vhost('delete', $data);
+		if ($data['old']['type'] == 'vhost' || $data['old']['type'] == 'vhostsubdomain') $this->vhost_helper('delete', $data);
 
 		if ($data['old']['type'] == 'alias')
 		{
@@ -486,7 +424,7 @@ class nginx_reverse_proxy_plugin
 			foreach($client_vhosts as $vhost)
 			{
 				$data['old']['domain'] = $vhost['domain'];
-				$this->vhost('delete', $data);
+				$this->vhost_helper('delete', $data);
 
 				$app->log('Removing vhost file: '. $data['old']['domain'], LOGLEVEL_DEBUG);
 			}
@@ -509,6 +447,35 @@ class nginx_reverse_proxy_plugin
 	/*/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// # VHOST FUNCTIONS
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+	/* -- VHOST_HELPER - handler for the other vhost functions
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+	private function vhost_helper($action, $data, $tpl = '')
+	{
+		global $app;
+
+		//* $VAR: location of nginx vhost dirs
+		$nginx_vhosts = '/etc/nginx/sites-available';
+		$nginx_vhosts_enabled = '/etc/nginx/sites-enabled';
+
+		$data['vhost'] = array();
+
+		$data['vhost']['file_old'] = escapeshellcmd($nginx_vhosts .'/'. $data['old']['domain'] .'.vhost');
+		$data['vhost']['link_old'] = escapeshellcmd($nginx_vhosts_enabled .'/'. $data['old']['domain'] .'.vhost');
+		$data['vhost']['file_new'] = escapeshellcmd($nginx_vhosts .'/'. $data['new']['domain'] .'.vhost');
+		$data['vhost']['link_new'] = escapeshellcmd($nginx_vhosts_enabled .'/'. $data['new']['domain'] .'.vhost');
+
+		if (is_file($data['vhost']['file_old'])) $data['vhost']['file_old_check'] = 1;
+		if (is_file($data['vhost']['file_new'])) $data['vhost']['file_new_check'] = 1;
+
+		if (is_link($data['vhost']['link_old'])) $data['vhost']['link_old_check'] = 1;
+		if (is_link($data['vhost']['link_new'])) $data['vhost']['link_new_check'] = 1;
+
+		$method = "vhost_$action";
+		return $data['vhost'] = $this->$method($data, $app, $tpl);
+	}
+
 
 	/* -- VHOST_INSERT - creates the vhost file and link
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
@@ -576,6 +543,35 @@ class nginx_reverse_proxy_plugin
 	/*/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// # CERT FUNCTIONS
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+	/* -- CERT_HELPER - handler for the other cert functions
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+	private function cert_helper($action, $data)
+	{
+		global $app;
+
+		$data['cert'] = array();
+		$suffix = 'nginx';
+		$ssl_dir = $data['new']['document_root'] .'/ssl';
+
+		$data['cert']['crt'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.crt');
+		$data['cert']['key'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.key');
+		$data['cert']['bundle'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.bundle');
+		$data['cert'][$suffix .'_crt'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.'. $suffix .'.crt');
+		$data['cert'][$suffix .'_key'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.'. $suffix .'.key');
+
+		if (is_file($data['cert']['crt'])) $data['cert']['crt_check'] = 1;
+		if (is_file($data['cert'][$suffix .'_crt'])) $data['cert'][$suffix .'_crt_check'] = 1;
+
+		if (is_file($data['cert']['key'])) $data['cert']['key_check'] = 1;
+		if (is_file($data['cert'][$suffix .'_key'])) $data['cert'][$suffix .'_key_check'] = 1;
+		if (is_file($data['cert']['bundle'])) $data['cert']['bundle_check'] = 1;
+
+		$method = "cert_$action";
+		return $data['cert'] = $this->$method($data, $app, $suffix);
+	}
+
 
 	/* -- CERT_INSERT - creates the ssl cert files
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
