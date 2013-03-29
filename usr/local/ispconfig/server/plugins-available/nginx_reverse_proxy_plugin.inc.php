@@ -7,7 +7,6 @@ class nginx_reverse_proxy_plugin
 	var $class_name = 'nginx_reverse_proxy_plugin';
 
 	var $action = '';
-	var $ssl_certificate_changed = false;
 
 
 	/*////////////////////////////////////////////////////////////////////////////////////////
