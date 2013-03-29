@@ -18,8 +18,10 @@ class nginx_reverse_proxy_plugin
 	{
 		global $app;
 
+		//* $VAR: location of nginx vhost dirs
 		$nginx_vhosts = '/etc/nginx/sites-available';
 		$nginx_vhosts_enabled = '/etc/nginx/sites-enabled';
+
 		$data['vhost'] = array();
 
 		$data['vhost']['file_old'] = escapeshellcmd($nginx_vhosts .'/'. $data['old']['domain'] .'.vhost');
@@ -133,6 +135,7 @@ class nginx_reverse_proxy_plugin
 	{
 		global $app, $conf;
 
+		//* $VAR: command to run after vhost insert/update/delete
 		$final_command = '/etc/init.d/nginx restart && rm -rf /var/cache/nginx/*';
 
 		if ($this->action != 'insert') $this->action = 'update';
@@ -151,6 +154,8 @@ class nginx_reverse_proxy_plugin
 		$vhost_data['web_basedir'] = $web_config['website_basedir'];
 		$vhost_data['ssl_domain'] = $data['new']['ssl_domain'];
 
+
+		/* __ VHOST & VHOSTSUBDOMAIN - section for vhosts and vhostsubdomains ///////////////////////////////////////*/
 		if ($data['new']['type'] == 'vhost' || $data['new']['type'] == 'vhostsubdomain')
 		{
 			if ($data['new']['ipv6_address'] != '') $tpl->setVar('ipv6_enabled', 1);
@@ -400,9 +405,7 @@ class nginx_reverse_proxy_plugin
 		}
 
 
-		if ($data['new']['type'] == 'vhostsubdomain') {}
-
-
+		/* __ ALIAS - section for aliasdomains //////////////////////////////////////////////////////////////////////*/
 		if ($data['new']['type'] == 'alias')
 		{
 			$parent_domain = $app->dbmaster->queryOneRecord('SELECT * FROM web_domain WHERE domain_id = '. intval($data['new']['parent_domain_id']) .'');
@@ -415,6 +418,7 @@ class nginx_reverse_proxy_plugin
 		}
 
 
+		/* __ SUBDOMAIN - section for classic subdomains ////////////////////////////////////////////////////////////*/
 		if ($data['new']['type'] == 'subdomain')
 		{
 			$parent_domain = $app->dbmaster->queryOneRecord('SELECT * FROM web_domain WHERE domain_id = '. intval($data['new']['parent_domain_id']) .'');
