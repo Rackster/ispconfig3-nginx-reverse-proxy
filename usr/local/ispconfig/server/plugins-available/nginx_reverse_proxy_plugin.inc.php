@@ -312,7 +312,7 @@ class nginx_reverse_proxy_plugin
 				);
 			}
 
-			/*if ($http_to_https == 1)
+			if ($http_to_https == 1)
 			{
 				$vhost_data['web_document_root_ssl'] = $data['new']['document_root'] .'/ssl';
 
@@ -324,8 +324,7 @@ class nginx_reverse_proxy_plugin
 						'ssl_enabled' => 1,
 						'http_to_https' => 0,
 						'rewrite_enabled' => 1,
-						'redirects' => $rewrite_rules,
-						'nginx_directives' => $nginx_directives,
+						#'nginx_directives' => $nginx_directives,
 						'errordocs' => $errordocs,
 						'port' => 443,
 						'apache2_port' => 82
@@ -339,14 +338,13 @@ class nginx_reverse_proxy_plugin
 						'ssl_enabled' => 1,
 						'http_to_https' => 0,
 						'rewrite_enabled' => 0,
-						'redirects' => '',
-						'nginx_directives' => $nginx_directives,
+						#'nginx_directives' => $nginx_directives,
 						'errordocs' => $errordocs,
 						'port' => 443,
 						'apache2_port' => 82
 					);
 				}
-			}*/
+			}
 
 			$tpl->setLoop('vhosts', $vhosts);
 
@@ -391,7 +389,7 @@ class nginx_reverse_proxy_plugin
 			$this->update($event_name, $data);
 		}
 
-		print_r($vhosts);
+		#print_r($vhosts);
 
 		exec($final_command);
 
