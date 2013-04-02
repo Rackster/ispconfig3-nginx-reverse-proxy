@@ -13,6 +13,23 @@ class nginx_reverse_proxy_plugin
 	// # ISPCONFIG FUNCTIONS
 	////////////////////////////////////////////////////////////////////////////////////////*/
 
+	/* -- ONINSTALL - called during ispconfig installation to determine if a symlink shall be created
+	////////////////////////////////////////////////////////////////////////////////////////*/
+	function onInstall()
+	{
+		global $conf;
+
+		if($conf['services']['web'] == true)
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+
 	/* -- ONLOAD - register the plugin for some site related events
 	////////////////////////////////////////////////////////////////////////////////////////*/
 
@@ -80,6 +97,7 @@ class nginx_reverse_proxy_plugin
 		if ($this->action != 'insert') $this->action = 'update';
 
 		$app->uses('getconf');
+		$app->uses('system');
 		$web_config = $app->getconf->get_server_config($conf['server_id'], 'web');
 
 		$app->load('tpl');
@@ -90,12 +108,12 @@ class nginx_reverse_proxy_plugin
 		$web_folder = 'web';
 		if($data['new']['type'] == 'vhostsubdomain')
 		{
-            $tmp = $app->db->queryOneRecord('SELECT `domain` FROM web_domain WHERE domain_id = '.intval($data['new']['parent_domain_id']));
-            $subdomain_host = preg_replace('/^(.*)\.' . preg_quote($tmp['domain'], '/') . '$/', '$1', $data['new']['domain']);
-            if($subdomain_host == '') $subdomain_host = 'web'.$data['new']['domain_id'];
-            $web_folder = $data['new']['web_folder'];
-            unset($tmp);
-        }
+			$tmp = $app->db->queryOneRecord('SELECT `domain` FROM web_domain WHERE domain_id = '.intval($data['new']['parent_domain_id']));
+			$subdomain_host = preg_replace('/^(.*)\.' . preg_quote($tmp['domain'], '/') . '$/', '$1', $data['new']['domain']);
+			if($subdomain_host == '') $subdomain_host = 'web'.$data['new']['domain_id'];
+			$web_folder = $data['new']['web_folder'];
+			unset($tmp);
+		}
 
 		$vhost_data = $data['new'];
 		$vhost_data['web_document_root'] = $data['new']['document_root'].'/'.$web_folder;
@@ -254,7 +272,7 @@ class nginx_reverse_proxy_plugin
 
 			$nginx_directives = str_replace("\r\n", "\n", $nginx_directives);
 			$nginx_directives = str_replace("\r", "\n", $nginx_directives);
-			//$nginx_directive_lines = explode("\n", $nginx_directives);
+			#$nginx_directives = explode("\n", $nginx_directives);
 
 			$crt_file = escapeshellcmd($data['new']['document_root'] .'/ssl/'. $data['new']['ssl_domain'] .'.crt');
 			$key_file = escapeshellcmd($data['new']['document_root'] .'/ssl/'. $data['new']['ssl_domain'] .'.key');
@@ -274,9 +292,7 @@ class nginx_reverse_proxy_plugin
 					'ipv6_address' => $data['new']['ipv6_address'],
 					'ssl_enabled' => 0,
 					'http_to_https' => $http_to_https,
-					'rewrite_enabled' => 1,
-					'redirects' => $rewrite_rules,
-					'nginx_directives' => $nginx_directives,
+					#'nginx_directives' => $nginx_directives,
 					'errordocs' => $errordocs,
 					'port' => 80,
 					'apache2_port' => 82
@@ -289,16 +305,14 @@ class nginx_reverse_proxy_plugin
 					'ipv6_address' => $data['new']['ipv6_address'],
 					'ssl_enabled' => 0,
 					'http_to_https' => $http_to_https,
-					'rewrite_enabled' => 0,
-					'redirects' => '',
-					'nginx_directives' => $nginx_directives,
+					#'nginx_directives' => $nginx_directives,
 					'errordocs' => $errordocs,
 					'port' => 80,
 					'apache2_port' => 82
 				);
 			}
 
-			if ($http_to_https == 1)
+			/*if ($http_to_https == 1)
 			{
 				$vhost_data['web_document_root_ssl'] = $data['new']['document_root'] .'/ssl';
 
@@ -332,7 +346,7 @@ class nginx_reverse_proxy_plugin
 						'apache2_port' => 82
 					);
 				}
-			}
+			}*/
 
 			$tpl->setLoop('vhosts', $vhosts);
 
@@ -377,9 +391,11 @@ class nginx_reverse_proxy_plugin
 			$this->update($event_name, $data);
 		}
 
+		print_r($vhosts);
+
 		exec($final_command);
 
-		if (isset($vhost_backup)) unlink($vhost_backup['file_new'] .'~');
+		if (isset($vhost_backup)) $app->system->unlink($vhost_backup['file_new'].'~');
 		unset($vhost_backup);
 
 		$this->action = '';
@@ -464,6 +480,8 @@ class nginx_reverse_proxy_plugin
 	{
 		global $app;
 
+		$app->uses('system');
+
 		//* $VAR: location of nginx vhost dirs
 		$nginx_vhosts = '/etc/nginx/sites-available';
 		$nginx_vhosts_enabled = '/etc/nginx/sites-enabled';
@@ -481,7 +499,7 @@ class nginx_reverse_proxy_plugin
 		if (is_link($data['vhost']['link_old'])) $data['vhost']['link_old_check'] = 1;
 		if (is_link($data['vhost']['link_new'])) $data['vhost']['link_new_check'] = 1;
 
-		return $data['vhost'] = call_user_func_array(array($this, $action), array($data, $app, $tpl));
+		return $data['vhost'] = call_user_func(array($this, "vhost_".$action), $data, $app, $tpl);
 	}
 
 
@@ -490,7 +508,10 @@ class nginx_reverse_proxy_plugin
 
 	private function vhost_insert($data, $app, $tpl)
 	{
+		global $app;
+
 		$app->uses('system');
+
 		$app->system->file_put_contents($data['vhost']['file_new'], $tpl);
 
 		$data['vhost']['file_new_check'] = 1;
@@ -513,6 +534,10 @@ class nginx_reverse_proxy_plugin
 
 	private function vhost_update($data, $app, $tpl)
 	{
+		global $app;
+
+		$app->uses('system');
+
 		$data['vhost']['link_new_check'] = 0;
 
 		if ($data['new']['active'] == 'n')
@@ -520,7 +545,7 @@ class nginx_reverse_proxy_plugin
 			$data['vhost']['link_new_check'] = 1;
 		}
 
-		exec('mv '. $data['vhost']['file_new'] .' '. $data['vhost']['file_new'] .'~');
+		$app->system->rename($data['vhost']['file_new'], $data['vhost']['file_new'].'~');
 		$data['vhost']['file_new_check'] = 0;
 		$data['vhost']['file_old_check'] = 0;
 
@@ -534,16 +559,20 @@ class nginx_reverse_proxy_plugin
 
 	private function vhost_delete($data, $app, $tpl = '')
 	{
+		global $app;
+
+		$app->uses('system');
+
 		if ($data['vhost']['file_old_check'] == 1)
 		{
-			unlink($data['vhost']['file_old']);
+			$app->system->unlink($data['vhost']['file_old']);
 			$data['vhost']['file_old_check'] = 0;
 			$app->log('Removing vhost file: '. $data['vhost']['file_old'], LOGLEVEL_DEBUG);
 		}
 
 		if ($data['vhost']['link_old_check'] == 1)
 		{
-			unlink($data['vhost']['link_old']);
+			$app->system->unlink($data['vhost']['link_old']);
 			$data['vhost']['link_old_check'] = 0;
 			$app->log('Removing vhost symlink: '. $data['vhost']['link_old'], LOGLEVEL_DEBUG);
 		}
@@ -560,6 +589,8 @@ class nginx_reverse_proxy_plugin
 	private function cert_helper($action, $data)
 	{
 		global $app;
+
+		$app->uses('system');
 
 		$data['cert'] = array();
 		$suffix = 'nginx';
@@ -578,8 +609,7 @@ class nginx_reverse_proxy_plugin
 		if (is_file($data['cert'][$suffix .'_key'])) $data['cert'][$suffix .'_key_check'] = 1;
 		if (is_file($data['cert']['bundle'])) $data['cert']['bundle_check'] = 1;
 
-		$method = "cert_$action";
-		return $data['cert'] = call_user_func_array(array($this, $action), array($data, $app, $suffix));
+		return $data['cert'] = call_user_func(array($this, "cert_".$action), $data, $app, $suffix);
 	}
 
 
@@ -588,6 +618,10 @@ class nginx_reverse_proxy_plugin
 
 	private function cert_insert($data, $app, $suffix)
 	{
+		global $app;
+
+		$app->uses('system');
+
 		if ($data['cert']['crt_check'] == 1 && $data['cert']['key_check'] == 1)
 		{
 			if ($data['cert']['bundle_check'] == 1)
@@ -597,15 +631,15 @@ class nginx_reverse_proxy_plugin
 				exec('cat '. $data['cert']['crt'] .' /tmp/ispconfig3_newline_fix '. $data['cert']['bundle'] .' > '. $data['cert'][$suffix .'_crt']);
 				$app->log('Merging ssl cert and bundle file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
 
-				exec('rm /tmp/ispconfig3_newline_fix');
+				$app->system->unlink("/tmp/ispconfig3_newline_fix");
 			}
 			else
 			{
-				exec('cp '. $data['cert']['crt'] .' '. $data['cert'][$suffix .'_crt']);
+				$app->system->copy($data['cert']['crt'], $data['cert'][$suffix .'_crt']);
 				$app->log('Copying ssl cert file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
 			}
 
-			exec('cp '. $data['cert']['key'] .' '. $data['cert'][$suffix .'_key']);
+			$app->system->copy($data['cert']['key'], $data['cert'][$suffix .'_key']);
 			$app->log('Copying ssl key file: '. $data['cert'][$suffix .'_key'], LOGLEVEL_DEBUG);
 		}
 		else
@@ -620,6 +654,8 @@ class nginx_reverse_proxy_plugin
 
 	private function cert_update($data, $app, $suffix)
 	{
+		global $app;
+
 		$this->cert_delete($data, $app, $suffix);
 		$this->cert_insert($data, $app, $suffix);
 	}
@@ -630,15 +666,19 @@ class nginx_reverse_proxy_plugin
 
 	private function cert_delete($data, $app, $suffix)
 	{
+		global $app;
+
+		$app->uses('system');
+
 		if ($data['cert'][$suffix .'_crt_check'] == 1)
 		{
-			unlink($data['cert']['nginx_crt']);
+			$app->system->unlink($data['cert']['nginx_crt']);
 			$app->log('Removing ssl cert file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
 		}
 
 		if ($data['cert'][$suffix .'_key_check'] == 1)
 		{
-			unlink($data['cert'][$suffix .'_key']);
+			$app->system->unlink($data['cert'][$suffix .'_key']);
 			$app->log('Removing ssl key file: '. $data['cert'][$suffix. '_key'], LOGLEVEL_DEBUG);
 		}
 	}
