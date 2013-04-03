@@ -1,4 +1,4 @@
-<tmpl_loop name="vhosts">
+<tmpl_loop name='vhosts'>
 server {
 
 	######################################################################
@@ -51,15 +51,6 @@ server {
 		if ($http_host = "<tmpl_var name='seo_redirect_origin_domain'>") {
 			rewrite ^ $scheme://<tmpl_var name='seo_redirect_target_domain'>$request_uri permanent;
 		}
-	</tmpl_if>
-
-	<tmpl_if name='rewrite_enabled'>
-		<tmpl_loop name="redirects">
-			# Redirects
-			#if ($http_host ~* "<tmpl_var name='rewrite_domain'>$") {
-			#	rewrite ^/(.+)$ <tmpl_var name='rewrite_target'>$1 <tmpl_var name='rewrite_type'>;
-			#}
-		</tmpl_loop>
 	</tmpl_if>
 
 	######################################################################
