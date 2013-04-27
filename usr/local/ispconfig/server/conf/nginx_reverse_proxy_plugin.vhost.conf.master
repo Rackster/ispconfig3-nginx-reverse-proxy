@@ -37,6 +37,18 @@ server {
 		ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.key;
 	</tmpl_if>
 
+	<tmpl_if name='ssl_enabled'>
+		######################################################################
+		## Pagespeed configuration
+		######################################################################
+
+		<tmpl_if name='seo_redirect_enabled'>
+			pagespeed LoadFromFile "https://<tmpl_var name='seo_redirect_target_domain'>" "<tmpl_var name='web_document_root_www'>/";
+		</tmpl_else>
+			pagespeed LoadFromFile "https://<tmpl_var name='domain'>" "<tmpl_var name='web_document_root_www'>/";
+		</tmpl_if>
+	</tmpl_if>
+
 	######################################################################
 	## Redirects configuration
 	######################################################################
