@@ -55,13 +55,13 @@ server {
 
 	<tmpl_if name='http_to_https'>
 		# Redirect http -> https
-		rewrite ^ https://$server_name$request_uri? permanent;
+		return 301 https://$server_name$request_uri?;
 	</tmpl_if>
 
 	<tmpl_if name='seo_redirect_enabled'>
 		# SEO Redirect
 		if ($http_host = "<tmpl_var name='seo_redirect_origin_domain'>") {
-			rewrite ^ $scheme://<tmpl_var name='seo_redirect_target_domain'>$request_uri permanent;
+			return 301 $scheme://<tmpl_var name='seo_redirect_target_domain'>$request_uri;
 		}
 	</tmpl_if>
 
@@ -89,13 +89,5 @@ server {
 
 	<tmpl_var name='nginx_directives'>
 
-	######################################################################
-	## CP configuration
-	######################################################################
-
-	# If domain.tld/ispconfig is requested, redirect to the secure ISPConfig URL
-	location = /apps { rewrite ^ <tmpl_var name='cp_base_url'>/ permanent; }
-
 }
-
 </tmpl_loop>
