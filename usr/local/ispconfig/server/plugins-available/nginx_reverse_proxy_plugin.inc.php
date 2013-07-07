@@ -136,7 +136,7 @@ class nginx_reverse_proxy_plugin {
 		global $app, $conf;
 
 		//* $VAR: command to run after vhost insert/update/delete
-		$final_command = '/etc/init.d/nginx restart && rm -rf /var/cache/nginx/*';
+		$final_command = 'rm -rf /var/cache/nginx/* && /etc/init.d/nginx restart';
 
 		if ($this->action != 'insert') {
 			$this->action = 'update';
