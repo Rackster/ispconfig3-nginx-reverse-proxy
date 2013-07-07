@@ -179,6 +179,8 @@ class nginx_reverse_proxy_plugin {
 			$server_alias = array();
 			switch($data['new']['subdomain']) {
 				case 'www':
+					// if seo-redirect is enabled, this should be placed in separate server block
+					// to prevent if statement in server/request!
 					$server_alias[] .= 'www.'. $data['new']['domain'] .' ';
 				break;
 				case '*':
@@ -190,6 +192,8 @@ class nginx_reverse_proxy_plugin {
 			$alias_result = $app->dbmaster->queryAllRecords('SELECT * FROM web_domain WHERE parent_domain_id = '.$data['new']['domain_id']." AND active = 'y' AND type != 'vhostsubdomain'");
 
 			if (count($alias_result) > 0) {
+				// if alias is redirect type, put in server block with seo-redirect to prevent
+				// if statement in server/request!
 				foreach($alias_result as $alias) {
 					switch($alias['subdomain']) {
 						case 'www':
