@@ -306,10 +306,9 @@ class nginx_reverse_proxy_plugin {
 				$vhost_data['seo_redirect_enabled'] = 0;
 			}
 
-			$nginx_directives = $data['new']['nginx_directives'];
-
 			$errordocs = !$data['new']['errordocs'];
 
+			$nginx_directives = $data['new']['nginx_directives'];
 			$nginx_directives = str_replace("\r\n", "\n", $nginx_directives);
 			$nginx_directives = str_replace("\r", "\n", $nginx_directives);
 
