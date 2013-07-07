@@ -55,7 +55,7 @@ server {
 
 	<tmpl_if name='http_to_https'>
 		# Redirect http -> https
-		return 301 https://$server_name$request_uri?;
+		return 301 https://$server_name$request_uri;
 	</tmpl_if>
 
 	<tmpl_if name='seo_redirect_enabled'>
