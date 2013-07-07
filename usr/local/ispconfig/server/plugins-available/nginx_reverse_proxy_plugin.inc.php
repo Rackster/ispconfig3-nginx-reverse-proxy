@@ -386,7 +386,11 @@ class nginx_reverse_proxy_plugin {
 		}
 
 
-		/* __ ALIAS - section for aliasdomains /////////////////////////////////////////////*/
+		/**
+		 * Section for aliasdomains.
+		 *
+		 * This section is used for aliasdomains.
+		 */
 		if ($data['new']['type'] == 'alias') {
 			$parent_domain = $app->dbmaster->queryOneRecord('SELECT * FROM web_domain WHERE domain_id = '. intval($data['new']['parent_domain_id']) .'');
 
@@ -397,8 +401,11 @@ class nginx_reverse_proxy_plugin {
 			$this->update($event_name, $data);
 		}
 
-
-		/* __ SUBDOMAIN - section for classic subdomains ///////////////////////////////////*/
+		/**
+		 * Section for classic subdomains.
+		 *
+		 * This section is used for classic subdomains (non vhost subdomains).
+		 */
 		if ($data['new']['type'] == 'subdomain') {
 			$parent_domain = $app->dbmaster->queryOneRecord('SELECT * FROM web_domain WHERE domain_id = '. intval($data['new']['parent_domain_id']) .'');
 
