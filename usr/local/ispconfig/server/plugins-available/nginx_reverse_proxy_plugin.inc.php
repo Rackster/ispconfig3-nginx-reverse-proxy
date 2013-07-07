@@ -312,7 +312,6 @@ class nginx_reverse_proxy_plugin {
 
 			$nginx_directives = str_replace("\r\n", "\n", $nginx_directives);
 			$nginx_directives = str_replace("\r", "\n", $nginx_directives);
-			#$nginx_directives = explode("\n", $nginx_directives);
 
 			$crt_file = escapeshellcmd($data['new']['document_root'] .'/ssl/'. $data['new']['ssl_domain'] .'.crt');
 			$key_file = escapeshellcmd($data['new']['document_root'] .'/ssl/'. $data['new']['ssl_domain'] .'.key');
@@ -323,13 +322,14 @@ class nginx_reverse_proxy_plugin {
 				$http_to_https = 0;
 			}
 
+			// non-ssl vhost loop
 			if (count($rewrite_rules) > 0) {
 				$vhosts[] = array(
 					'ip_address' => $data['new']['ip_address'],
 					'ipv6_address' => $data['new']['ipv6_address'],
 					'ssl_enabled' => 0,
 					'http_to_https' => $http_to_https,
-					#'nginx_directives' => $nginx_directives,
+					'nginx_directives' => $nginx_directives,
 					'errordocs' => $errordocs,
 					'port' => 80,
 					'apache2_port' => 82
@@ -340,13 +340,14 @@ class nginx_reverse_proxy_plugin {
 					'ipv6_address' => $data['new']['ipv6_address'],
 					'ssl_enabled' => 0,
 					'http_to_https' => $http_to_https,
-					#'nginx_directives' => $nginx_directives,
+					'nginx_directives' => $nginx_directives,
 					'errordocs' => $errordocs,
 					'port' => 80,
 					'apache2_port' => 82
 				);
 			}
 
+			// ssl vhost loop
 			if ($http_to_https == 1) {
 				$vhost_data['web_document_root_ssl'] = $data['new']['document_root'] .'/ssl';
 
@@ -357,7 +358,7 @@ class nginx_reverse_proxy_plugin {
 						'ssl_enabled' => 1,
 						'http_to_https' => 0,
 						'rewrite_enabled' => 1,
-						#'nginx_directives' => $nginx_directives,
+						'nginx_directives' => $nginx_directives,
 						'errordocs' => $errordocs,
 						'port' => 443,
 						'apache2_port' => 82
@@ -369,7 +370,7 @@ class nginx_reverse_proxy_plugin {
 						'ssl_enabled' => 1,
 						'http_to_https' => 0,
 						'rewrite_enabled' => 0,
-						#'nginx_directives' => $nginx_directives,
+						'nginx_directives' => $nginx_directives,
 						'errordocs' => $errordocs,
 						'port' => 443,
 						'apache2_port' => 82
