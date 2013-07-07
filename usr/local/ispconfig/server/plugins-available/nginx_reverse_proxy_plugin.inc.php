@@ -136,7 +136,7 @@ class nginx_reverse_proxy_plugin {
 		global $app, $conf;
 
 		//* $VAR: command to run after vhost insert/update/delete
-		$final_command = '/etc/init.d/nginx restart && rm -rf /var/cache/nginx/*';
+		$final_command = 'rm -rf /var/cache/nginx/* && /etc/init.d/nginx restart';
 
 		if ($this->action != 'insert') {
 			$this->action = 'update';
@@ -179,6 +179,8 @@ class nginx_reverse_proxy_plugin {
 			$server_alias = array();
 			switch($data['new']['subdomain']) {
 				case 'www':
+					// if seo-redirect is enabled, this should be placed in separate server block
+					// to prevent if statement in server/request!
 					$server_alias[] .= 'www.'. $data['new']['domain'] .' ';
 				break;
 				case '*':
@@ -190,6 +192,8 @@ class nginx_reverse_proxy_plugin {
 			$alias_result = $app->dbmaster->queryAllRecords('SELECT * FROM web_domain WHERE parent_domain_id = '.$data['new']['domain_id']." AND active = 'y' AND type != 'vhostsubdomain'");
 
 			if (count($alias_result) > 0) {
+				// if alias is redirect type, put in server block with seo-redirect to prevent
+				// if statement in server/request!
 				foreach($alias_result as $alias) {
 					switch($alias['subdomain']) {
 						case 'www':
@@ -302,13 +306,11 @@ class nginx_reverse_proxy_plugin {
 				$vhost_data['seo_redirect_enabled'] = 0;
 			}
 
-			$nginx_directives = $data['new']['nginx_directives'];
-
 			$errordocs = !$data['new']['errordocs'];
 
+			$nginx_directives = $data['new']['nginx_directives'];
 			$nginx_directives = str_replace("\r\n", "\n", $nginx_directives);
 			$nginx_directives = str_replace("\r", "\n", $nginx_directives);
-			#$nginx_directives = explode("\n", $nginx_directives);
 
 			$crt_file = escapeshellcmd($data['new']['document_root'] .'/ssl/'. $data['new']['ssl_domain'] .'.crt');
 			$key_file = escapeshellcmd($data['new']['document_root'] .'/ssl/'. $data['new']['ssl_domain'] .'.key');
@@ -319,13 +321,14 @@ class nginx_reverse_proxy_plugin {
 				$http_to_https = 0;
 			}
 
+			// non-ssl vhost loop
 			if (count($rewrite_rules) > 0) {
 				$vhosts[] = array(
 					'ip_address' => $data['new']['ip_address'],
 					'ipv6_address' => $data['new']['ipv6_address'],
 					'ssl_enabled' => 0,
 					'http_to_https' => $http_to_https,
-					#'nginx_directives' => $nginx_directives,
+					'nginx_directives' => $nginx_directives,
 					'errordocs' => $errordocs,
 					'port' => 80,
 					'apache2_port' => 82
@@ -336,13 +339,14 @@ class nginx_reverse_proxy_plugin {
 					'ipv6_address' => $data['new']['ipv6_address'],
 					'ssl_enabled' => 0,
 					'http_to_https' => $http_to_https,
-					#'nginx_directives' => $nginx_directives,
+					'nginx_directives' => $nginx_directives,
 					'errordocs' => $errordocs,
 					'port' => 80,
 					'apache2_port' => 82
 				);
 			}
 
+			// ssl vhost loop
 			if ($http_to_https == 1) {
 				$vhost_data['web_document_root_ssl'] = $data['new']['document_root'] .'/ssl';
 
@@ -353,7 +357,7 @@ class nginx_reverse_proxy_plugin {
 						'ssl_enabled' => 1,
 						'http_to_https' => 0,
 						'rewrite_enabled' => 1,
-						#'nginx_directives' => $nginx_directives,
+						'nginx_directives' => $nginx_directives,
 						'errordocs' => $errordocs,
 						'port' => 443,
 						'apache2_port' => 82
@@ -365,7 +369,7 @@ class nginx_reverse_proxy_plugin {
 						'ssl_enabled' => 1,
 						'http_to_https' => 0,
 						'rewrite_enabled' => 0,
-						#'nginx_directives' => $nginx_directives,
+						'nginx_directives' => $nginx_directives,
 						'errordocs' => $errordocs,
 						'port' => 443,
 						'apache2_port' => 82

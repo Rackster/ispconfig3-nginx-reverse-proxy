@@ -60,9 +60,9 @@ server {
 
 	<tmpl_if name='seo_redirect_enabled'>
 		# SEO Redirect
-		if ($http_host = "<tmpl_var name='seo_redirect_origin_domain'>") {
-			return 301 $scheme://<tmpl_var name='seo_redirect_target_domain'>$request_uri;
-		}
+		#if ($http_host = "<tmpl_var name='seo_redirect_origin_domain'>") {
+		#	return 301 $scheme://<tmpl_var name='seo_redirect_target_domain'>$request_uri;
+		#}
 	</tmpl_if>
 
 	######################################################################
