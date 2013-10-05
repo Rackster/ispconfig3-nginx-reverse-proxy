@@ -1,13 +1,13 @@
-# ISPConfig3 - nginx Reverse Proxy Plugin
+# ISPConfig3 - Nginx Reverse Proxy
 
-This plugin allows you to run nginx in front of apache2 as a reverse proxy on servers managed through the ISPConfig3 Control Panel.
+This plugin allows you to run Nginx in front of Apache2 as a reverse proxy on servers managed through the ISPConfig3 Control Panel.
 
 
 ## How it works
 
-In general, it just creates the nginx vhost files for your sites.
+In general, it just creates the Nginx vhost files for your sites.
 
-Afterwards, all requests to port 80 or 443 (default http(s) ports) are fetched by nginx rather than apache2 and passed to the apache2 backend - with nginx's built-in *proxy_pass* feature.
+Afterwards, all requests to port 80 or 443 (default http(s) ports) are fetched by Nginx rather than Apache2 and passed to the Apache2 backend - with Nginx's built-in *proxy_pass* feature.
 
 
 ## How to install
