@@ -2,29 +2,24 @@
 
 This plugin allows you to run Nginx in front of Apache2 as a reverse proxy on servers managed through the ISPConfig3 Control Panel.
 
-
 ## How it works
 
 In general, it just creates the Nginx vhost files for your sites.
 
 Afterwards, all requests to port 80 or 443 (default http(s) ports) are fetched by Nginx rather than Apache2 and passed to the Apache2 backend - with Nginx's built-in *proxy_pass* feature.
 
-
 ## How to install
 
 Please refer to the wiki which can be found here: [Wiki](https://github.com/Rackster/ispconfig3-nginx-reverse-proxy/wiki)
-
 
 ## Contribution
 
 Feel free to be an active part of the project, either by testing and creating issues or forking and sending pull requests.
 
-
 ## Disclaimer
 
 I am in no way responsible for any damage caused to your system by using the plugin.
 Usage at you own risk!
-
 
 ## Donation
 

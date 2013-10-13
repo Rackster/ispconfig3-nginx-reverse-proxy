@@ -48,12 +48,7 @@ class nginx_reverse_proxy_plugin {
 	 */
 	function onInstall() {
 		global $conf;
-
-		if($conf['services']['web'] == true) {
-			return true;
-		} else {
-			return false;
-		}
+		return $conf['services']['web'] == true;
 	}
 
 	/**
