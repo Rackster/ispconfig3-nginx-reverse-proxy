@@ -1,40 +1,62 @@
 <?php
 
-class nginx_reverse_proxy_plugin
-{
+/**
+ * ISPConfig Nginx Reverse Proxy Plugin.
+ *
+ * This class extends ISPConfig's vhost management with the functionality to run
+ * Nginx in front of Apache2 as a transparent reverse proxy.
+ *
+ * @author Rackster Internet Services <open-source@rackster.ch>
+ * @link https://open-source.rackster.ch/project/ispconfig3-nginx-reverse-proxy-plugin
+ */
+class nginx_reverse_proxy_plugin {
 
+	/**
+	 * Stores the internal plugin name.
+	 *
+	 * @var string
+	 */
 	var $plugin_name = 'nginx_reverse_proxy_plugin';
+
+	/**
+	 * Stores the internal class name.
+	 *
+	 * Needs to be the same as $plugin_name.
+	 *
+	 * @var string
+	 */
 	var $class_name = 'nginx_reverse_proxy_plugin';
 
+	/**
+	 * Stores the current vhost action.
+	 *
+	 * When ISPConfig triggers the vhost event, it passes either create,update,delete etc.
+	 *
+	 * @see onLoad()
+	 *
+	 * @var string
+	 */
 	var $action = '';
 
 
-	/*////////////////////////////////////////////////////////////////////////////////////////
-	// # ISPCONFIG FUNCTIONS
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	/* -- ONINSTALL - called during ispconfig installation to determine if a symlink shall be created
-	////////////////////////////////////////////////////////////////////////////////////////*/
-	function onInstall()
-	{
+	/**
+	 * ISPConfig onInstall hook.
+	 *
+	 * Called during ISPConfig installation to determine if a symlink shall be created.
+	 *
+	 * @return bool create symlink if true
+	 */
+	function onInstall() {
 		global $conf;
-
-		if($conf['services']['web'] == true)
-		{
-			return true;
-		}
-		else
-		{
-			return false;
-		}
+		return $conf['services']['web'] == true;
 	}
 
-
-	/* -- ONLOAD - register the plugin for some site related events
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	function onLoad()
-	{
+	/**
+	 * ISPConfig onLoad hook.
+	 *
+	 * Register the plugin for some site related events.
+	 */
+	function onLoad() {
 		global $app;
 
 		$app->plugins->registerEvent('web_domain_insert', $this->plugin_name, 'ssl');
@@ -49,52 +71,71 @@ class nginx_reverse_proxy_plugin
 	}
 
 
-	/* -- SSL - called every time something in the ssl tab is done
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	function ssl($event_name, $data)
-	{
+	/**
+	 * ISPConfig ssl hook.
+	 *
+	 * Called every time something in the ssl tab is done.
+	 *
+	 * @see onLoad()
+	 * @uses cert_helper()
+	 *
+	 * @param string $event_name the event/action name
+	 * @param array $data the vhost data
+	 */
+	function ssl($event_name, $data) {
 		global $app, $conf;
 
 		$app->uses('system');
 
 		//* Only vhosts can have a ssl cert
-		if($data["new"]["type"] != "vhost" && $data["new"]["type"] != "vhostsubdomain") return;
-
-		if ($data['new']['ssl_action'] == 'del')
-		{
-			$this->cert_helper('delete', $data);
+		if($data["new"]["type"] != "vhost" && $data["new"]["type"] != "vhostsubdomain") {
+			return;
 		}
-		else
-		{
+
+		if ($data['new']['ssl_action'] == 'del') {
+			$this->cert_helper('delete', $data);
+		} else {
 			$this->cert_helper('update', $data);
 		}
 	}
 
-
-	/* -- INSERT - called every time a new site is created
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	function insert($event_name, $data)
-	{
+	/**
+	 * ISPConfig insert hook.
+	 *
+	 * Called every time a new site is created.
+	 *
+	 * @uses update()
+	 *
+	 * @param string $event_name the event/action name
+	 * @param array $data the vhost data
+	 */
+	function insert($event_name, $data)	{
 		global $app, $conf;
 
 		$this->action = 'insert';
 		$this->update($event_name, $data);
 	}
 
-
-	/* -- UPDATE - called every time a site gets updated from within ISPConfig
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	function update($event_name, $data)
-	{
+	/**
+	 * ISPConfig update hook.
+	 *
+	 * Called every time a site gets updated from within ISPConfig.
+	 *
+	 * @see insert()
+	 * @see delete()
+	 *
+	 * @param string $event_name the event/action name
+	 * @param array $data the vhost data
+	 */
+	function update($event_name, $data)	{
 		global $app, $conf;
 
 		//* $VAR: command to run after vhost insert/update/delete
-		$final_command = '/etc/init.d/nginx restart && rm -rf /var/cache/nginx/*';
+		$final_command = '/etc/init.d/nginx reload';
 
-		if ($this->action != 'insert') $this->action = 'update';
+		if ($this->action != 'insert') {
+			$this->action = 'update';
+		}
 
 		$app->uses('getconf');
 		$app->uses('system');
@@ -106,11 +147,14 @@ class nginx_reverse_proxy_plugin
 		$tpl->newTemplate('nginx_reverse_proxy_plugin.vhost.conf.master');
 
 		$web_folder = 'web';
-		if($data['new']['type'] == 'vhostsubdomain')
-		{
+		if($data['new']['type'] == 'vhostsubdomain') {
 			$tmp = $app->db->queryOneRecord('SELECT `domain` FROM web_domain WHERE domain_id = '.intval($data['new']['parent_domain_id']));
 			$subdomain_host = preg_replace('/^(.*)\.' . preg_quote($tmp['domain'], '/') . '$/', '$1', $data['new']['domain']);
-			if($subdomain_host == '') $subdomain_host = 'web'.$data['new']['domain_id'];
+
+			if($subdomain_host == '') {
+				$subdomain_host = 'web'.$data['new']['domain_id'];
+			}
+
 			$web_folder = $data['new']['web_folder'];
 			unset($tmp);
 		}
@@ -122,34 +166,37 @@ class nginx_reverse_proxy_plugin
 		$vhost_data['ssl_domain'] = $data['new']['ssl_domain'];
 
 		/* __ VHOST & VHOSTSUBDOMAIN - section for vhosts and vhostsubdomains //////////////*/
-		if ($data['new']['type'] == 'vhost' || $data['new']['type'] == 'vhostsubdomain')
-		{
-			if ($data['new']['ipv6_address'] != '') $tpl->setVar('ipv6_enabled', 1);
+		if ($data['new']['type'] == 'vhost' || $data['new']['type'] == 'vhostsubdomain') {
+			if ($data['new']['ipv6_address'] != '') {
+				$tpl->setVar('ipv6_enabled', 1);
+			}
 
 			$server_alias = array();
-			switch($data['new']['subdomain'])
-			{
+			switch($data['new']['subdomain']) {
 				case 'www':
+					// if seo-redirect is enabled, this should be placed in separate server block
+					// to prevent if statement in server/request!
 					$server_alias[] .= 'www.'. $data['new']['domain'] .' ';
-					break;
+				break;
 				case '*':
 					$server_alias[] .= '*.'. $data['new']['domain'] .' ';
-					break;
+				break;
 			}
+
 			$alias_result = array();
 			$alias_result = $app->dbmaster->queryAllRecords('SELECT * FROM web_domain WHERE parent_domain_id = '.$data['new']['domain_id']." AND active = 'y' AND type != 'vhostsubdomain'");
-			if (count($alias_result) > 0)
-			{
-				foreach($alias_result as $alias)
-				{
-					switch($alias['subdomain'])
-					{
+
+			if (count($alias_result) > 0) {
+				// if alias is redirect type, put in server block with seo-redirect to prevent
+				// if statement in server/request!
+				foreach($alias_result as $alias) {
+					switch($alias['subdomain']) {
 						case 'www':
 							$server_alias[] .= 'www.'. $alias['domain'] .' '. $alias['domain'] .' ';
-							break;
+						break;
 						case '*':
 							$server_alias[] .= '*.'. $alias['domain'] .' '. $alias['domain'] .' ';
-							break;
+						break;
 						default:
 							$server_alias[] .= $alias['domain'] .' ';
 					}
@@ -159,60 +206,53 @@ class nginx_reverse_proxy_plugin
 
 				unset($alias);
 			}
-			if (count($server_alias) > 0)
-			{
+
+			if (count($server_alias) > 0) {
 				$server_alias_str = '';
 
-				foreach($server_alias as $tmp_alias)
-				{
+				foreach($server_alias as $tmp_alias) {
 					$server_alias_str .= $tmp_alias;
 				}
 
 				unset($tmp_alias);
 				$tpl->setVar('alias', $server_alias_str);
-			}
-			else
-			{
+			} else {
 				$tpl->setVar('alias', '');
 			}
 
-			if (!isset($rewrite_rules)) $rewrite_rules = array();
-			if ($data['new']['redirect_type'] != '' && $data['new']['redirect_path'] != '')
-			{
-				if (substr($data['new']['redirect_path'], -1) != '/') $data['new']['redirect_path'] .= '/';
-				if (substr($data['new']['redirect_path'], 0, 8) == '[scheme]')
-				{
+			if (!isset($rewrite_rules)) {
+				$rewrite_rules = array();
+			}
+
+			if ($data['new']['redirect_type'] != '' && $data['new']['redirect_path'] != '')	{
+				if (substr($data['new']['redirect_path'], -1) != '/') {
+					$data['new']['redirect_path'] .= '/';
+				}
+
+				if (substr($data['new']['redirect_path'], 0, 8) == '[scheme]') {
 					$rewrite_target = 'http'.substr($data['new']['redirect_path'], 8);
 					$rewrite_target_ssl = 'https'.substr($data['new']['redirect_path'], 8);
-				}
-				else
-				{
+				} else {
 					$rewrite_target = $data['new']['redirect_path'];
 					$rewrite_target_ssl = $data['new']['redirect_path'];
 				}
 
-				if (substr($data['new']['redirect_path'], 0, 4) == 'http')
-				{
+				if (substr($data['new']['redirect_path'], 0, 4) == 'http') {
 					$data['new']['redirect_type'] = 'permanent';
-				}
-				else
-				{
-					switch($data['new']['redirect_type'])
-					{
+				} else {
+					switch($data['new']['redirect_type']) {
 						case 'no':
 							$data['new']['redirect_type'] = 'break';
-							break;
+						break;
 						case 'L':
 							$data['new']['redirect_type'] = 'break';
-							break;
+						break;
 						default:
 							$data['new']['redirect_type'] = 'permanent';
-							break;
 					}
 				}
 
-				switch($data['new']['subdomain'])
-				{
+				switch($data['new']['subdomain']) {
 					case 'www':
 						$rewrite_rules[] = array(
 							'rewrite_domain' => '^'.$data['new']['domain'],
@@ -226,7 +266,7 @@ class nginx_reverse_proxy_plugin
 							'rewrite_target' => $rewrite_target,
 							'rewrite_target_ssl' => $rewrite_target_ssl
 						);
-						break;
+					break;
 					case '*':
 						$rewrite_rules[] = array(
 							'rewrite_domain' => '(^|\.)'.$data['new']['domain'],
@@ -234,7 +274,7 @@ class nginx_reverse_proxy_plugin
 							'rewrite_target' => $rewrite_target,
 							'rewrite_target_ssl' => $rewrite_target_ssl
 						);
-						break;
+					break;
 					default:
 						$rewrite_rules[] = array(
 							'rewrite_domain' => '^'.$data['new']['domain'],
@@ -245,100 +285,86 @@ class nginx_reverse_proxy_plugin
 				}
 			}
 
-			if ($data['new']['seo_redirect'] != '' && ($data['new']['subdomain'] == 'www' || $data['new']['subdomain'] == '*'))
-			{
+			if ($data['new']['seo_redirect'] != '' && ($data['new']['subdomain'] == 'www' || $data['new']['subdomain'] == '*')) {
 				$vhost_data['seo_redirect_enabled'] = 1;
 
-				if ($data['new']['seo_redirect'] == 'non_www_to_www')
-				{
+				if ($data['new']['seo_redirect'] == 'non_www_to_www') {
 					$vhost_data['seo_redirect_origin_domain'] = $data['new']['domain'];
 					$vhost_data['seo_redirect_target_domain'] = 'www.'. $data['new']['domain'];
 				}
 
-				if ($data['new']['seo_redirect'] == 'www_to_non_www')
-				{
+				if ($data['new']['seo_redirect'] == 'www_to_non_www') {
 					$vhost_data['seo_redirect_origin_domain'] = 'www.'. $data['new']['domain'];
 					$vhost_data['seo_redirect_target_domain'] = $data['new']['domain'];
 				}
-			}
-			else
-			{
+			} else {
 				$vhost_data['seo_redirect_enabled'] = 0;
 			}
 
-			$nginx_directives = $data['new']['nginx_directives'];
-
 			$errordocs = !$data['new']['errordocs'];
 
+			$nginx_directives = $data['new']['nginx_directives'];
 			$nginx_directives = str_replace("\r\n", "\n", $nginx_directives);
 			$nginx_directives = str_replace("\r", "\n", $nginx_directives);
-			#$nginx_directives = explode("\n", $nginx_directives);
 
 			$crt_file = escapeshellcmd($data['new']['document_root'] .'/ssl/'. $data['new']['ssl_domain'] .'.crt');
 			$key_file = escapeshellcmd($data['new']['document_root'] .'/ssl/'. $data['new']['ssl_domain'] .'.key');
-			if ($data['new']['ssl_domain'] != '' && $data['new']['ssl'] == 'y' && is_file($crt_file) && is_file($key_file) && (filesize($crt_file) > 0) && (filesize($key_file) > 0))
-			{
+
+			if ($data['new']['ssl_domain'] != '' && $data['new']['ssl'] == 'y' && is_file($crt_file) && is_file($key_file) && (filesize($crt_file) > 0) && (filesize($key_file) > 0)) {
 				$http_to_https = 1;
-			}
-			else
-			{
+			} else {
 				$http_to_https = 0;
 			}
 
-			if (count($rewrite_rules) > 0)
-			{
+			// non-ssl vhost loop
+			if (count($rewrite_rules) > 0) {
 				$vhosts[] = array(
 					'ip_address' => $data['new']['ip_address'],
 					'ipv6_address' => $data['new']['ipv6_address'],
 					'ssl_enabled' => 0,
 					'http_to_https' => $http_to_https,
-					#'nginx_directives' => $nginx_directives,
+					'nginx_directives' => $nginx_directives,
 					'errordocs' => $errordocs,
 					'port' => 80,
 					'apache2_port' => 82
 				);
-			}
-			else
-			{
+			} else {
 				$vhosts[] = array(
 					'ip_address' => $data['new']['ip_address'],
 					'ipv6_address' => $data['new']['ipv6_address'],
 					'ssl_enabled' => 0,
 					'http_to_https' => $http_to_https,
-					#'nginx_directives' => $nginx_directives,
+					'nginx_directives' => $nginx_directives,
 					'errordocs' => $errordocs,
 					'port' => 80,
 					'apache2_port' => 82
 				);
 			}
 
-			if ($http_to_https == 1)
-			{
+			// ssl vhost loop
+			if ($http_to_https == 1) {
 				$vhost_data['web_document_root_ssl'] = $data['new']['document_root'] .'/ssl';
 
-				if (count($rewrite_rules) > 0)
-				{
+				if (count($rewrite_rules) > 0) {
 					$vhosts[] = array(
 						'ip_address' => $data['new']['ip_address'],
 						'ipv6_address' => $data['new']['ipv6_address'],
 						'ssl_enabled' => 1,
 						'http_to_https' => 0,
 						'rewrite_enabled' => 1,
-						#'nginx_directives' => $nginx_directives,
+						'nginx_directives' => $nginx_directives,
 						'errordocs' => $errordocs,
 						'port' => 443,
 						'apache2_port' => 82
 					);
-				}
-				else
-				{
+				} else {
 					$vhosts[] = array(
 						'ip_address' => $data['new']['ip_address'],
 						'ipv6_address' => $data['new']['ipv6_address'],
 						'ssl_enabled' => 1,
 						'http_to_https' => 0,
 						'rewrite_enabled' => 0,
-						#'nginx_directives' => $nginx_directives,
+						'nginx_directives' => $nginx_directives,
 						'errordocs' => $errordocs,
 						'port' => 443,
 						'apache2_port' => 82
@@ -347,26 +373,24 @@ class nginx_reverse_proxy_plugin
 			}
 
 			$tpl->setLoop('vhosts', $vhosts);
-
-			//* $VAR: ISPConfig CP URL
-			$tpl->setVar('cp_base_url', 'https://cp.rackster.ch:8081');
 			$tpl->setVar($vhost_data);
 
-			if ($this->action == 'insert')
-			{
+			if ($this->action == 'insert') {
 				$this->vhost_helper('insert', $data, $tpl->grab());
 			}
 
-			if ($this->action == 'update')
-			{
+			if ($this->action == 'update') {
 				$vhost_backup = $this->vhost_helper('update', $data, $tpl->grab());
 			}
 		}
 
 
-		/* __ ALIAS - section for aliasdomains /////////////////////////////////////////////*/
-		if ($data['new']['type'] == 'alias')
-		{
+		/**
+		 * Section for aliasdomains.
+		 *
+		 * This section is used for aliasdomains.
+		 */
+		if ($data['new']['type'] == 'alias') {
 			$parent_domain = $app->dbmaster->queryOneRecord('SELECT * FROM web_domain WHERE domain_id = '. intval($data['new']['parent_domain_id']) .'');
 
 			$parent_domain['parent_domain_id'] = $data['new']['parent_domain_id'];
@@ -376,10 +400,12 @@ class nginx_reverse_proxy_plugin
 			$this->update($event_name, $data);
 		}
 
-
-		/* __ SUBDOMAIN - section for classic subdomains ///////////////////////////////////*/
-		if ($data['new']['type'] == 'subdomain')
-		{
+		/**
+		 * Section for classic subdomains.
+		 *
+		 * This section is used for classic subdomains (non vhost subdomains).
+		 */
+		if ($data['new']['type'] == 'subdomain') {
 			$parent_domain = $app->dbmaster->queryOneRecord('SELECT * FROM web_domain WHERE domain_id = '. intval($data['new']['parent_domain_id']) .'');
 
 			$parent_domain['parent_domain_id'] = $data['new']['parent_domain_id'];
@@ -388,23 +414,28 @@ class nginx_reverse_proxy_plugin
 
 			$this->update($event_name, $data);
 		}
-
-		#print_r($vhosts);
 
 		exec($final_command);
 
-		if (isset($vhost_backup)) $app->system->unlink($vhost_backup['file_new'].'~');
-		unset($vhost_backup);
+		if (isset($vhost_backup)) {
+			$app->system->unlink($vhost_backup['file_new'].'~');
+		}
 
+		unset($vhost_backup);
 		$this->action = '';
 	}
 
-
-	/* -- DELETE - called every time, a site get's removed
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	function delete($event_name, $data)
-	{
+	/**
+	 * ISPConfig delete hook.
+	 *
+	 * Called every time, a site get's removed.
+	 *
+	 * @uses update()
+	 *
+	 * @param string $event_name the event/action name
+	 * @param array $data the vhost data
+	 */
+	function delete($event_name, $data) {
 		global $app, $conf;
 
 		$this->action = 'delete';
@@ -412,27 +443,32 @@ class nginx_reverse_proxy_plugin
 		$app->uses('getconf');
 		$web_config = $app->getconf->get_server_config($conf['server_id'], 'web');
 
-		if ($data['old']['type'] == 'vhost' || $data['old']['type'] == 'vhostsubdomain') $this->vhost_helper('delete', $data);
+		if ($data['old']['type'] == 'vhost' || $data['old']['type'] == 'vhostsubdomain') {
+			$this->vhost_helper('delete', $data);
+		}
 
-		if ($data['old']['type'] == 'alias')
-		{
+		if ($data['old']['type'] == 'alias') {
 			$data['new']['type'] == 'alias';
 			$this->update($event_name, $data);
 		}
 
-		if ($data['old']['type'] == 'subdomain')
-		{
+		if ($data['old']['type'] == 'subdomain') {
 			$data['new']['type'] == 'subdomain';
 			$this->update($event_name, $data);
 		}
 	}
 
-
-	/* -- CLIENT_DELETE - called every time, a client gets deleted
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	function client_delete($event_name, $data)
-	{
+	/**
+	 * ISPConfig client delete hook.
+	 *
+	 * Called every time, a client gets deleted.
+	 *
+	 * @uses vhost_helper()
+	 *
+	 * @param string $event_name the event/action name
+	 * @param array $data the vhost data
+	 */
+	function client_delete($event_name, $data) {
 		global $app, $conf;
 
 		$app->uses('getconf');
@@ -442,10 +478,8 @@ class nginx_reverse_proxy_plugin
 		$client_vhosts = array();
 		$client_vhosts = $app->dbmaster->queryAllRecords('SELECT domain FROM web_domain WHERE sys_userid = '. $client_id .' AND parent_domain_id = 0');
 
-		if (count($client_vhosts) > 0)
-		{
-			foreach($client_vhosts as $vhost)
-			{
+		if (count($client_vhosts) > 0) {
+			foreach($client_vhosts as $vhost) {
 				$data['old']['domain'] = $vhost['domain'];
 				$this->vhost_helper('delete', $data);
 
@@ -455,11 +489,14 @@ class nginx_reverse_proxy_plugin
 	}
 
 
-	/* -- _EXEC - function for easier debugging
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	private function _exec($command)
-	{
+	/**
+	 * ISPConfig internal debug function.
+	 *
+	 * Function for easier debugging.
+	 *
+	 * @param string $command executable command to debug
+	 */
+	private function _exec($command) {
 		global $app;
 
 		$app->log('exec: '. $command, LOGLEVEL_DEBUG);
@@ -467,15 +504,17 @@ class nginx_reverse_proxy_plugin
 	}
 
 
-	/*////////////////////////////////////////////////////////////////////////////////////////
-	// # VHOST FUNCTIONS
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	/* -- VHOST_HELPER - handler for the other vhost functions
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	private function vhost_helper($action, $data, $tpl = '')
-	{
+	/**
+	 * Helps managing vhost config files.
+	 *
+	 * This functions helps to create/delete and link/unlink vhost configs on disk.
+	 *
+	 * @param string $action the event/action name
+	 * @param array $data the vhost data
+	 * @param mixed $tpl vhost template to proceed
+	 * @return $data['vhost'] the vhost data
+	 */
+	private function vhost_helper($action, $data, $tpl = '') {
 		global $app;
 
 		$app->uses('system');
@@ -491,21 +530,42 @@ class nginx_reverse_proxy_plugin
 		$data['vhost']['file_new'] = escapeshellcmd($nginx_vhosts .'/'. $data['new']['domain'] .'.vhost');
 		$data['vhost']['link_new'] = escapeshellcmd($nginx_vhosts_enabled .'/'. $data['new']['domain'] .'.vhost');
 
-		if (is_file($data['vhost']['file_old'])) $data['vhost']['file_old_check'] = 1;
-		if (is_file($data['vhost']['file_new'])) $data['vhost']['file_new_check'] = 1;
+		if (is_file($data['vhost']['file_old'])) {
+			$data['vhost']['file_old_check'] = 1;
+		}
 
-		if (is_link($data['vhost']['link_old'])) $data['vhost']['link_old_check'] = 1;
-		if (is_link($data['vhost']['link_new'])) $data['vhost']['link_new_check'] = 1;
+		if (is_file($data['vhost']['file_new'])) {
+			$data['vhost']['file_new_check'] = 1;
+		}
 
-		return $data['vhost'] = call_user_func(array($this, "vhost_".$action), $data, $app, $tpl);
+		if (is_link($data['vhost']['link_old'])) {
+			$data['vhost']['link_old_check'] = 1;
+		}
+
+		if (is_link($data['vhost']['link_new'])) {
+			$data['vhost']['link_new_check'] = 1;
+		}
+
+		return $data['vhost'] = call_user_func(
+			array(
+				$this,
+				"vhost_".$action
+			),
+			$data,
+			$app,
+			$tpl
+		);
 	}
 
-
-	/* -- VHOST_INSERT - creates the vhost file and link
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	private function vhost_insert($data, $app, $tpl)
-	{
+	/**
+	 * Creates the vhost file and link.
+	 *
+	 * @param array $data the vhost data
+	 * @param object $app ISPConfig app object
+	 * @param mixed $tpl vhost template to proceed
+	 * @return $data['vhost'] the vhost data
+	 */
+	private function vhost_insert($data, $app, $tpl) {
 		global $app;
 
 		$app->uses('system');
@@ -516,8 +576,7 @@ class nginx_reverse_proxy_plugin
 		$app->log('Creating vhost file: '. $data['vhost']['file_new'], LOGLEVEL_DEBUG);
 		unset($tpl);
 
-		if ($data['vhost']['link_new_check'] != 1)
-		{
+		if ($data['vhost']['link_new_check'] != 1) {
 			exec('ln -s '. $data['vhost']['file_new'] .' '. $data['vhost']['link_new']);
 			$data['vhost']['link_new_check'] = 1;
 			$app->log('Creating vhost symlink: '. $data['vhost']['link_new_check'], LOGLEVEL_DEBUG);
@@ -526,20 +585,25 @@ class nginx_reverse_proxy_plugin
 		return $data['vhost'];
 	}
 
-
-	/* -- VHOST_UPDATE - updates the vhost file and link
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	private function vhost_update($data, $app, $tpl)
-	{
+	/**
+	 * Updates the vhost file and link.
+	 *
+	 * @uses vhost_delete()
+	 * @uses vhost_insert()
+	 *
+	 * @param array $data the vhost data
+	 * @param object $app ISPConfig app object
+	 * @param mixed $tpl vhost template to proceed
+	 * @return
+	 */
+	private function vhost_update($data, $app, $tpl) {
 		global $app;
 
 		$app->uses('system');
 
 		$data['vhost']['link_new_check'] = 0;
 
-		if ($data['new']['active'] == 'n')
-		{
+		if ($data['new']['active'] == 'n') {
 			$data['vhost']['link_new_check'] = 1;
 		}
 
@@ -551,25 +615,25 @@ class nginx_reverse_proxy_plugin
 		return $this->vhost_insert($data, $app, $tpl);
 	}
 
-
-	/* -- VHOST_DELETE - deletes the vhost file and link
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	private function vhost_delete($data, $app, $tpl = '')
-	{
+	/**
+	 * Deletes the vhost file and link.
+	 *
+	 * @param array $data the vhost data
+	 * @param object $app ISPConfig app object
+	 * @param mixed $tpl vhost template to proceed
+	 */
+	private function vhost_delete($data, $app, $tpl = '') {
 		global $app;
 
 		$app->uses('system');
 
-		if ($data['vhost']['file_old_check'] == 1)
-		{
+		if ($data['vhost']['file_old_check'] == 1) {
 			$app->system->unlink($data['vhost']['file_old']);
 			$data['vhost']['file_old_check'] = 0;
 			$app->log('Removing vhost file: '. $data['vhost']['file_old'], LOGLEVEL_DEBUG);
 		}
 
-		if ($data['vhost']['link_old_check'] == 1)
-		{
+		if ($data['vhost']['link_old_check'] == 1) {
 			$app->system->unlink($data['vhost']['link_old']);
 			$data['vhost']['link_old_check'] = 0;
 			$app->log('Removing vhost symlink: '. $data['vhost']['link_old'], LOGLEVEL_DEBUG);
@@ -577,15 +641,16 @@ class nginx_reverse_proxy_plugin
 	}
 
 
-	/*////////////////////////////////////////////////////////////////////////////////////////
-	// # CERT FUNCTIONS
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	/* -- CERT_HELPER - handler for the other cert functions
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	private function cert_helper($action, $data)
-	{
+	/**
+	 * Helps managing SSL cert files.
+	 *
+	 * This functions helps to create/delete and link/unlink SSL cert files on disk.
+	 *
+	 * @param string $action the event/action name
+	 * @param array $data the vhost data
+	 * @return $data['cert'] the cert data
+	 */
+	private function cert_helper($action, $data) {
 		global $app;
 
 		$app->uses('system');
@@ -600,82 +665,104 @@ class nginx_reverse_proxy_plugin
 		$data['cert'][$suffix .'_crt'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.'. $suffix .'.crt');
 		$data['cert'][$suffix .'_key'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.'. $suffix .'.key');
 
-		if (is_file($data['cert']['crt'])) $data['cert']['crt_check'] = 1;
-		if (is_file($data['cert'][$suffix .'_crt'])) $data['cert'][$suffix .'_crt_check'] = 1;
+		if (is_file($data['cert']['crt'])) {
+			$data['cert']['crt_check'] = 1;
+		}
 
-		if (is_file($data['cert']['key'])) $data['cert']['key_check'] = 1;
-		if (is_file($data['cert'][$suffix .'_key'])) $data['cert'][$suffix .'_key_check'] = 1;
-		if (is_file($data['cert']['bundle'])) $data['cert']['bundle_check'] = 1;
+		if (is_file($data['cert'][$suffix .'_crt'])) {
+			$data['cert'][$suffix .'_crt_check'] = 1;
+		}
 
-		return $data['cert'] = call_user_func(array($this, "cert_".$action), $data, $app, $suffix);
+		if (is_file($data['cert']['key'])) {
+			$data['cert']['key_check'] = 1;
+		}
+
+		if (is_file($data['cert'][$suffix .'_key'])) {
+			$data['cert'][$suffix .'_key_check'] = 1;
+		}
+
+		if (is_file($data['cert']['bundle'])) {
+			$data['cert']['bundle_check'] = 1;
+		}
+
+		return $data['cert'] = call_user_func(
+			array(
+				$this,
+				"cert_".$action
+			),
+			$data,
+			$app,
+			$suffix
+		);
 	}
 
-
-	/* -- CERT_INSERT - creates the ssl cert files
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	private function cert_insert($data, $app, $suffix)
-	{
+	/**
+	 * Creates the ssl cert files.
+	 *
+	 * @param array $data the vhost data
+	 * @param object $app ISPConfig app object
+	 * @param string $suffix cert filename suffix
+	 */
+	private function cert_insert($data, $app, $suffix) {
 		global $app;
 
 		$app->uses('system');
 
-		if ($data['cert']['crt_check'] == 1 && $data['cert']['key_check'] == 1)
-		{
-			if ($data['cert']['bundle_check'] == 1)
-			{
+		if ($data['cert']['crt_check'] == 1 && $data['cert']['key_check'] == 1)	{
+			if ($data['cert']['bundle_check'] == 1)	{
 				exec('echo "" > /tmp/ispconfig3_newline_fix');
 
 				exec('cat '. $data['cert']['crt'] .' /tmp/ispconfig3_newline_fix '. $data['cert']['bundle'] .' > '. $data['cert'][$suffix .'_crt']);
 				$app->log('Merging ssl cert and bundle file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
 
 				$app->system->unlink("/tmp/ispconfig3_newline_fix");
-			}
-			else
-			{
+			} else {
 				$app->system->copy($data['cert']['crt'], $data['cert'][$suffix .'_crt']);
 				$app->log('Copying ssl cert file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
 			}
 
 			$app->system->copy($data['cert']['key'], $data['cert'][$suffix .'_key']);
 			$app->log('Copying ssl key file: '. $data['cert'][$suffix .'_key'], LOGLEVEL_DEBUG);
-		}
-		else
-		{
+		} else {
 			$app->log('Creating '. $suffix .' ssl files failed', LOGLEVEL_DEBUG);
 		}
 	}
 
-
-	/* -- CERT_UPDATE - changes the ssl cert files
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	private function cert_update($data, $app, $suffix)
-	{
+	/**
+	 * Changes the ssl cert files.
+	 *
+	 * @uses cert_delete()
+	 * @uses cert_insert()
+	 *
+	 * @param array $data the vhost data
+	 * @param object $app ISPConfig app object
+	 * @param string $suffix cert filename suffix
+	 */
+	private function cert_update($data, $app, $suffix) {
 		global $app;
 
 		$this->cert_delete($data, $app, $suffix);
 		$this->cert_insert($data, $app, $suffix);
 	}
 
-
-	/* -- CERT_DELETE - removes the ssl cert files
-	////////////////////////////////////////////////////////////////////////////////////////*/
-
-	private function cert_delete($data, $app, $suffix)
-	{
+	/**
+	 * Removes the ssl cert files.
+	 *
+	 * @param array $data the vhost data
+	 * @param object $app ISPConfig app object
+	 * @param string $suffix cert filename suffix
+	 */
+	private function cert_delete($data, $app, $suffix) {
 		global $app;
 
 		$app->uses('system');
 
-		if ($data['cert'][$suffix .'_crt_check'] == 1)
-		{
+		if ($data['cert'][$suffix .'_crt_check'] == 1) {
 			$app->system->unlink($data['cert']['nginx_crt']);
 			$app->log('Removing ssl cert file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
 		}
 
-		if ($data['cert'][$suffix .'_key_check'] == 1)
-		{
+		if ($data['cert'][$suffix .'_key_check'] == 1) {
 			$app->system->unlink($data['cert'][$suffix .'_key']);
 			$app->log('Removing ssl key file: '. $data['cert'][$suffix. '_key'], LOGLEVEL_DEBUG);
 		}

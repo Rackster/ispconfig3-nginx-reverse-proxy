@@ -8,12 +8,12 @@ server {
 	<tmpl_if name='ssl_enabled'>
 		listen <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'>:</tmpl_if>443 ssl spdy;
 		<tmpl_if name='ipv6_enabled'>
-			listen [::]:443 ipv6only=on ssl spdy;
+			listen [<tmpl_var name='ipv6_address'>]:443 ipv6only=on ssl spdy;
 		</tmpl_if>
 	</tmpl_else>
 		listen <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'>:</tmpl_if>80;
 		<tmpl_if name='ipv6_enabled'>
-			listen [::]:80 ipv6only=on;
+			listen [<tmpl_var name='ipv6_address'>]:80 ipv6only=on;
 		</tmpl_if>
 	</tmpl_if>
 
@@ -37,54 +37,49 @@ server {
 		ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.key;
 	</tmpl_if>
 
+	<tmpl_if name='ssl_enabled'>
+		######################################################################
+		## Pagespeed configuration
+		######################################################################
+
+		<tmpl_if name='seo_redirect_enabled'>
+			pagespeed LoadFromFile "https://<tmpl_var name='seo_redirect_target_domain'>" "<tmpl_var name='web_document_root_www'>/";
+		</tmpl_else>
+			pagespeed LoadFromFile "https://<tmpl_var name='domain'>" "<tmpl_var name='web_document_root_www'>/";
+		</tmpl_if>
+	</tmpl_if>
+
 	######################################################################
 	## Redirects configuration
 	######################################################################
 
 	<tmpl_if name='http_to_https'>
 		# Redirect http -> https
-		rewrite ^ https://$server_name$request_uri? permanent;
+		return 301 https://$server_name$request_uri;
 	</tmpl_if>
 
 	<tmpl_if name='seo_redirect_enabled'>
 		# SEO Redirect
 		if ($http_host = "<tmpl_var name='seo_redirect_origin_domain'>") {
-			rewrite ^ $scheme://<tmpl_var name='seo_redirect_target_domain'>$request_uri permanent;
+			return 301 $scheme://<tmpl_var name='seo_redirect_target_domain'>$request_uri;
 		}
 	</tmpl_if>
-
-	######################################################################
-	## Error configuration
-	######################################################################
-
-	error_page 400 /error/400.html;
-	error_page 401 /error/401.html;
-	error_page 403 /error/403.html;
-	error_page 404 /error/404.html;
-	error_page 405 /error/405.html;
-	error_page 500 /error/500.html;
-	error_page 502 /error/502.html;
-	error_page 503 /error/503.html;
 
 	######################################################################
 	## Locations configuration
 	######################################################################
 
+	# global locations
+	include /etc/nginx/locations.d/*.conf;
+
 	# alias to local error docs
 	<tmpl_if name='errordocs'>
-		location ^~ /error {
-			root /var/www;
-		}
+		location ^~ /error { root /var/www; }
 	</tmpl_if>
-
-	# disallow dotfile access
-	location ^~ /\. {
-		deny all;
-		return 404;
-	}
 
 	# default location
 	location / {
+		limit_req zone=ddos-cage burst=25;
 		proxy_cache nginx_cache;
 		proxy_pass http://127.0.0.1:<tmpl_var name='apache2_port'>;
 	}
@@ -95,13 +90,5 @@ server {
 
 	<tmpl_var name='nginx_directives'>
 
-	######################################################################
-	## CP configuration
-	######################################################################
-
-	# If domain.tld/ispconfig is requested, redirect to the secure ISPConfig URL
-	location = /apps { rewrite ^ <tmpl_var name='cp_base_url'>/ permanent; }
-
 }
-
 </tmpl_loop>
