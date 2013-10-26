@@ -49,7 +49,6 @@ class nginx_reverse_proxy_plugin {
 	 * Private variables (temporary stores)
 	 */
 	var $action = '';
-	var $ssl_certificate_changed = false;
 
 
 	/**
@@ -126,8 +125,6 @@ class nginx_reverse_proxy_plugin {
 
 		//* Create a SSL Certificate (done by Apache2)
 		if ($data['new']['ssl_action'] == 'create' && $conf['mirror_server_id'] == 0) {
-			$this->ssl_certificate_changed = true;
-
 			//* Rename files if they exist
 			if (file_exists($crt_file)) {
 				$app->system->rename($crt_file, $crt_file.'.bak');
@@ -137,8 +134,6 @@ class nginx_reverse_proxy_plugin {
 
 		//* Save a SSL certificate to disk
 		if ($data["new"]["ssl_action"] == 'save') {
-			$this->ssl_certificate_changed = true;
-
 			$ssl_dir = $data["new"]["document_root"]."/ssl";
 			$domain = ($data["new"]["ssl_domain"] != '') ? $data["new"]["ssl_domain"] : $data["new"]["domain"];
 			$crt_file = $ssl_dir.'/'.$domain.".nginx.crt";
@@ -246,14 +241,6 @@ class nginx_reverse_proxy_plugin {
 		$app->uses('getconf');
 		$web_config = $app->getconf->get_server_config($conf['server_id'], 'web');
 
-		//* Check if this is a chrooted setup
-		if ($web_config['website_basedir'] != '' && @is_file($web_config['website_basedir'].'/etc/passwd')) {
-			$nginx_chrooted = true;
-			$app->log('Info: nginx is chrooted.', LOGLEVEL_DEBUG);
-		} else {
-			$nginx_chrooted = false;
-		}
-
 		if ($data['new']['document_root'] == '') {
 			if ($data['new']['type'] == 'vhost' || $data['new']['type'] == 'vhostsubdomain') {
 				$app->log('document_root not set', LOGLEVEL_WARN);
@@ -278,11 +265,6 @@ class nginx_reverse_proxy_plugin {
 		}
 
 		$app->uses('system');
-
-		$groupname = escapeshellcmd($data['new']['system_group']);
-		$username = escapeshellcmd($data['new']['system_user']);
-
-		//* Create the vhost config file
 		$app->load('tpl');
 
 		$tpl = new tpl();
@@ -976,8 +958,6 @@ class nginx_reverse_proxy_plugin {
 
 		//* The vhost is written and apache has been restarted, so we
 		// can reset the ssl changed var to false and cleanup some files
-		$this->ssl_certificate_changed = false;
-
 		$ssl_dir = $data['new']['document_root'].'/ssl';
 		$domain = $data['new']['ssl_domain'];
 		$crt_file = $ssl_dir.'/'.$domain.'.nginx.crt';
@@ -995,93 +975,21 @@ class nginx_reverse_proxy_plugin {
 	}
 
 	/**
+	 * ISPConfig delete hook.
 	 *
+	 * Called every time a site gets deleted from within ISPConfig.
+	 *
+	 * @param string $event_name the event/action name
+	 * @param array $data the vhost data
+	 * @return void
 	 */
-	function delete($event_name,$data) {
+	function delete($event_name, $data) {
 		global $app, $conf;
 
-		// load the server configuration options
 		$app->uses('getconf');
 		$app->uses('system');
+
 		$web_config = $app->getconf->get_server_config($conf['server_id'], 'web');
-
-		if ($data['old']['type'] == 'vhost' || $data['old']['type'] == 'vhostsubdomain') {
-			$app->system->web_folder_protection($data['old']['document_root'],false);
-		}
-
-		//* Check if this is a chrooted setup
-		if ($web_config['website_basedir'] != '' && @is_file($web_config['website_basedir'].'/etc/passwd')) {
-			$nginx_chrooted = true;
-		} else {
-			$nginx_chrooted = false;
-		}
-
-		//* Remove the mounts
-		$log_folder = 'log';
-		$web_folder = '';
-
-		if ($data['old']['type'] == 'vhostsubdomain') {
-			$tmp = $app->db->queryOneRecord('SELECT `domain`,`document_root` FROM web_domain WHERE domain_id = '.intval($data['old']['parent_domain_id']));
-
-			if ($tmp['domain'] != '') {
-				$subdomain_host = preg_replace('/^(.*)\.' . preg_quote($tmp['domain'], '/') . '$/', '$1', $data['old']['domain']);
-			} else {
-				// we are deleting the parent domain, so we can delete everything in the log directory
-				$subdomain_hosts = array();
-				$files = array_diff(scandir($data['old']['document_root'].'/'.$log_folder), array('.','..'));
-
-				if (is_array($files) && !empty($files)) {
-					foreach ($files as $file) {
-						if (is_dir($data['old']['document_root'].'/'.$log_folder.'/'.$file)) {
-							$subdomain_hosts[] = $file;
-						}
-					}
-				}
-			}
-
-			if (is_array($subdomain_hosts) && !empty($subdomain_hosts)) {
-				$log_folders = array();
-
-				foreach ($subdomain_hosts as $subdomain_host) {
-					$log_folders[] = $log_folder.'/'.$subdomain_host;
-				}
-			} else {
-				if ($subdomain_host == '') {
-					$subdomain_host = 'web'.$data['old']['domain_id'];
-				}
-
-				$log_folder .= '/' . $subdomain_host;
-			}
-
-			$web_folder = $data['old']['web_folder'];
-			unset($tmp);
-			unset($subdomain_hosts);
-		}
-
-		if ($data['old']['type'] == 'vhost' || $data['old']['type'] == 'vhostsubdomain') {
-			if (is_array($log_folders) && !empty($log_folders)) {
-				foreach ($log_folders as $log_folder) {
-					//if ($app->system->is_mounted($data['old']['document_root'].'/'.$log_folder)) exec('umount '.escapeshellarg($data['old']['document_root'].'/'.$log_folder));
-					exec('umount '.escapeshellarg($data['old']['document_root'].'/'.$log_folder).' 2>/dev/null');
-				}
-			} else {
-				//if ($app->system->is_mounted($data['old']['document_root'].'/'.$log_folder)) exec('umount '.escapeshellarg($data['old']['document_root'].'/'.$log_folder));
-				exec('umount '.escapeshellarg($data['old']['document_root'].'/'.$log_folder).' 2>/dev/null');
-			}
-		}
-
-		//* remove mountpoint from fstab
-		if (is_array($log_folders) && !empty($log_folders)) {
-			foreach ($log_folders as $log_folder) {
-				$fstab_line = '/var/log/ispconfig/httpd/'.$data['old']['domain'].' '.$data['old']['document_root'].'/'.$log_folder.'    none    bind';
-				$app->system->removeLine('/etc/fstab',$fstab_line);
-			}
-		} else {
-			$fstab_line = '/var/log/ispconfig/httpd/'.$data['old']['domain'].' '.$data['old']['document_root'].'/'.$log_folder.'    none    bind';
-			$app->system->removeLine('/etc/fstab',$fstab_line);
-		}
-
-		unset($log_folders);
 
 		if ($data['old']['type'] != 'vhost' && $data['old']['type'] != 'vhostsubdomain' && $data['old']['parent_domain_id'] > 0) {
 			//* This is a alias domain or subdomain, so we have to update the website instead
@@ -1089,9 +997,9 @@ class nginx_reverse_proxy_plugin {
 			$tmp = $app->db->queryOneRecord('SELECT * FROM web_domain WHERE domain_id = '.$parent_domain_id." AND active = 'y'");
 			$data['new'] = $tmp;
 			$data['old'] = $tmp;
+
 			$this->action = 'update';
-			// just run the update function
-			$this->update($event_name,$data);
+			$this->update($event_name, $data);
 		} else {
 			//* This is a website
 			// Deleting the vhost file, symlink and the data directory
@@ -1119,197 +1027,6 @@ class nginx_reverse_proxy_plugin {
 
 			$app->system->unlink($vhost_file);
 			$app->log('Removing vhost file: '.$vhost_file,LOGLEVEL_DEBUG);
-
-			if ($data['old']['type'] == 'vhost' || $data['old']['type'] == 'vhostsubdomain') {
-				$docroot = escapeshellcmd($data['old']['document_root']);
-
-				if ($docroot != '' && !stristr($docroot,'..')) {
-					if ($data['old']['type'] == 'vhost') {
-						// this is a vhost - we delete everything in here.
-						exec('rm -rf '.$docroot);
-					} elseif (!stristr($data['old']['web_folder'], '..')) {
-						// this is a vhost subdomain
-						// IMPORTANT: do some folder checks before we delete this!
-						$do_delete = true;
-						$delete_folder = preg_replace('/[\/]{2,}/', '/', $web_folder); // replace / occuring multiple times
-
-						if (substr($delete_folder, 0, 1) === '/') {
-							$delete_folder = substr($delete_folder, 1);
-						}
-
-						if (substr($delete_folder, -1) === '/') {
-							$delete_folder = substr($delete_folder, 0, -1);
-						}
-
-						$path_elements = explode('/', $delete_folder);
-
-						if ($path_elements[0] == 'web' || $path_elements[0] === '') {
-							// paths beginning with /web should NEVER EVER be deleted, empty paths should NEVER occur - but for safety reasons we check it here!
-							// we use strict check as otherwise directories named '0' may not be deleted
-							$do_delete = false;
-						} else {
-							// read all vhost subdomains with same parent domain
-							$used_paths = array();
-							$tmp = $app->db->queryAllRecords("SELECT `web_folder` FROM web_domain WHERE type = 'vhostsubdomain' AND parent_domain_id = ".intval($data['old']['parent_domain_id'])." AND domain_id != ".intval($data['old']['domain_id']));
-
-							foreach ($tmp as $tmprec) {
-								// we normalize the folder entries because we need to compare them
-								$tmp_folder = preg_replace('/[\/]{2,}/', '/', $tmprec['web_folder']); // replace / occuring multiple times
-								if (substr($tmp_folder, 0, 1) === '/') {
-									$tmp_folder = substr($tmp_folder, 1);
-								}
-
-								if (substr($tmp_folder, -1) === '/') {
-									$tmp_folder = substr($tmp_folder, 0, -1);
-								}
-
-								// add this path and it's parent paths to used_paths array
-								while (strpos($tmp_folder, '/') !== false) {
-									if (in_array($tmp_folder, $used_paths) == false) {
-										$used_paths[] = $tmp_folder;
-									}
-
-									$tmp_folder = substr($tmp_folder, 0, strrpos($tmp_folder, '/'));
-								}
-
-								if (in_array($tmp_folder, $used_paths) == false) {
-									$used_paths[] = $tmp_folder;
-								}
-							}
-
-							unset($tmp);
-
-							// loop and check if the path is still used and stop at first used one
-							// set do_delete to false so nothing gets deleted if the web_folder itself is still used
-							$do_delete = false;
-							while (count($path_elements) > 0) {
-								$tmp_folder = implode('/', $path_elements);
-
-								if (in_array($tmp_folder, $used_paths) == true) {
-									break;
-								}
-
-								// this path is not used - set it as path to delete, strip the last element from the array and set do_delete to true
-								$delete_folder = $tmp_folder;
-								$do_delete = true;
-								array_pop($path_elements);
-							}
-
-							unset($tmp_folder);
-							unset($used_paths);
-						}
-
-						if ($do_delete === true && $delete_folder !== '') {
-							exec('rm -rf '.$docroot.'/'.$delete_folder);
-						}
-
-						unset($delete_folder);
-						unset($path_elements);
-					}
-				}
-
-				//remove the php fastgi starter script if available
-				if ($data['old']['php'] == 'fast-cgi') {
-					$this->php_fpm_pool_delete($data,$web_config);
-					$fastcgi_starter_path = str_replace('[system_user]',$data['old']['system_user'],$web_config['fastcgi_starter_path']);
-
-					if ($data['old']['type'] == 'vhost') {
-						if (is_dir($fastcgi_starter_path)) {
-							exec('rm -rf '.$fastcgi_starter_path);
-						}
-					} else {
-						$fcgi_starter_script = $fastcgi_starter_path.$web_config['fastcgi_starter_script'].'_web'.$data['old']['domain_id'];
-
-						if (file_exists($fcgi_starter_script)) {
-							exec('rm -f '.$fcgi_starter_script);
-						}
-					}
-				}
-
-				// remove PHP-FPM pool
-				if ($data['old']['php'] == 'php-fpm') {
-					$this->php_fpm_pool_delete($data,$web_config);
-				}
-
-				//remove the php cgi starter script if available
-				if ($data['old']['php'] == 'cgi') {
-					// TODO: fetch the date from the server-settings
-					$web_config['cgi_starter_path'] = $web_config['website_basedir'].'/php-cgi-scripts/[system_user]/';
-					$cgi_starter_path = str_replace('[system_user]',$data['old']['system_user'],$web_config['cgi_starter_path']);
-
-					if ($data['old']['type'] == 'vhost') {
-						if (is_dir($cgi_starter_path)) {
-							exec('rm -rf '.$cgi_starter_path);
-						}
-					} else {
-						$cgi_starter_script = $cgi_starter_path.'php-cgi-starter_web'.$data['old']['domain_id'];
-
-						if (file_exists($cgi_starter_script)) {
-							exec('rm -f '.$cgi_starter_script);
-						}
-					}
-				}
-
-				$app->log('Removing website: '.$docroot,LOGLEVEL_DEBUG);
-
-				// Delete the symlinks for the sites
-				$client = $app->db->queryOneRecord('SELECT client_id FROM sys_group WHERE sys_group.groupid = '.intval($data['old']['sys_groupid']));
-				$client_id = intval($client['client_id']);
-				unset($client);
-				$tmp_symlinks_array = explode(':',$web_config['website_symlinks']);
-
-				if (is_array($tmp_symlinks_array)) {
-					foreach ($tmp_symlinks_array as $tmp_symlink) {
-						$tmp_symlink = str_replace('[client_id]',$client_id,$tmp_symlink);
-						$tmp_symlink = str_replace('[website_domain]',$data['old']['domain'],$tmp_symlink);
-
-						// Remove trailing slash
-						if (substr($tmp_symlink, -1, 1) == '/') {
-							$tmp_symlink = substr($tmp_symlink, 0, -1);
-						}
-
-						// create the symlinks, if not exist
-						if (is_link($tmp_symlink)) {
-							$app->system->unlink($tmp_symlink);
-							$app->log('Removing symlink: '.$tmp_symlink,LOGLEVEL_DEBUG);
-						}
-					}
-				}
-				// end removing symlinks
-			} else {
-				// vhost subdomain
-			}
-
-			// Delete the log file directory
-			$vhost_logfile_dir = escapeshellcmd('/var/log/ispconfig/httpd/'.$data['old']['domain']);
-
-			if ($data['old']['domain'] != '' && !stristr($vhost_logfile_dir,'..')) {
-				exec('rm -rf '.$vhost_logfile_dir);
-			}
-
-			$app->log('Removing website logfile directory: '.$vhost_logfile_dir,LOGLEVEL_DEBUG);
-
-			if ($data['old']['type'] == 'vhost') {
-				//delete the web user
-				$command = 'killall -u '.escapeshellcmd($data['old']['system_user']).' ; userdel';
-				$command .= ' '.escapeshellcmd($data['old']['system_user']);
-				exec($command);
-
-				if ($nginx_chrooted) {
-					$this->_exec('chroot '.escapeshellcmd($web_config['website_basedir']).' '.$command);
-				}
-			}
-
-			//* Remove the awstats configuration file
-			if ($data['old']['stats_type'] == 'awstats') {
-				$this->awstats_delete($data,$web_config);
-			}
-
-			$app->services->restartServiceDelayed('httpd','reload');
-		}
-
-		if ($data['old']['type'] != 'vhost') {
-			$app->system->web_folder_protection($data['old']['document_root'],true);
 		}
 	}
 
