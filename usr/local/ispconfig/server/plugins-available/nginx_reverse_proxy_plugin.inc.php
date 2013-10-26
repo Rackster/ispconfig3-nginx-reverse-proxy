@@ -29,33 +29,46 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 /**
+ * ISPConfig3 Nginx Reverse Proxy.
  *
+ * This class extends ISPConfig's vhost management with the functionality to run
+ * Nginx in front of Apache2 as a transparent reverse proxy.
+ *
+ * @author Rackster Internet Services <open-source@rackster.ch>
+ * @link https://open-source.rackster.ch/project/ispconfig3-nginx-reverse-proxy
  */
 class nginx_reverse_proxy_plugin {
 
 	/**
-	 *
+	 * ISPConfig internals
 	 */
 	var $plugin_name = 'nginx_reverse_proxy_plugin';
 	var $class_name = 'nginx_reverse_proxy_plugin';
 
 	/**
-	 *
+	 * Private variables (temporary stores)
 	 */
 	var $action = '';
 	var $ssl_certificate_changed = false;
 
 
 	/**
+	 * ISPConfig onInstall hook.
 	 *
+	 * Called during ISPConfig installation to determine if a symlink shall be created.
+	 *
+	 * @return bool create symlink if true
 	 */
 	function onInstall() {
 		global $conf;
+
 		return $conf['services']['web'];
 	}
 
 	/**
+	 * ISPConfig onLoad hook.
 	 *
+	 * Register the plugin for some site related events.
 	 */
 	function onLoad() {
 		global $app;
@@ -83,7 +96,13 @@ class nginx_reverse_proxy_plugin {
 	}
 
 	/**
+	 * ISPConfig ssl hook.
 	 *
+	 * Called every time something in the ssl tab is done.
+	 *
+	 * @param string $event_name the event/action name
+	 * @param array $data the vhost data
+	 * @return void
 	 */
 	function ssl($event_name, $data) {
 		global $app, $conf;
@@ -165,7 +184,12 @@ class nginx_reverse_proxy_plugin {
 	}
 
 	/**
+	 * ISPConfig insert hook.
 	 *
+	 * Called every time a new site is created.
+	 *
+	 * @param string $event_name the event/action name
+	 * @param array $data the vhost data
 	 */
 	function insert($event_name, $data) {
 		global $app, $conf;
@@ -2142,7 +2166,13 @@ class nginx_reverse_proxy_plugin {
 	}
 
 	/**
+	 * ISPConfig server IP hook.
 	 *
+	 * This function is called when a IP on the server is inserted, updated or deleted.
+	 *
+	 * @param string $event_name the event/action name
+	 * @param array $data the vhost data
+	 * @return void
 	 */
 	function server_ip($event_name, $data) {
 		return;
@@ -2549,32 +2579,28 @@ class nginx_reverse_proxy_plugin {
 	}
 
 	/**
+	 * ISPConfig client delete hook.
 	 *
+	 * Called every time, a client gets deleted.
+	 *
+	 * @param string $event_name the event/action name
+	 * @param array $data the vhost data
+	 * @return void
 	 */
-	function client_delete($event_name, $data) {}
+	function client_delete($event_name, $data) {
+		return;
+	}
 
 	/**
+	 * ISPConfig internal debug method.
 	 *
+	 * @param string $command executable command to debug
 	 */
 	private function _exec($command) {
 		global $app;
 
 		$app->log('exec: '.$command, LOGLEVEL_DEBUG);
 		exec($command);
-	}
-
-	/**
-	 *
-	 */
-	private function _checkTcp($host, $port) {
-		$fp = @fsockopen($host, $port, $errno, $errstr, 2);
-
-		if ($fp) {
-			@fclose($fp);
-			return true;
-		}
-
-		return false;
 	}
 
 	/**
