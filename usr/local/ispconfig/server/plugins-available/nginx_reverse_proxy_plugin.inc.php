@@ -28,32 +28,38 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/**
+ *
+ */
 class nginx_reverse_proxy_plugin {
 
+	/**
+	 *
+	 */
 	var $plugin_name = 'nginx_reverse_proxy_plugin';
 	var $class_name = 'nginx_reverse_proxy_plugin';
 
-	// private variables
+	/**
+	 *
+	 */
 	var $action = '';
 	var $ssl_certificate_changed = false;
 
-	//* This function is called during ispconfig installation to determine
-	//  if a symlink shall be created for this plugin.
+
+	/**
+	 *
+	 */
 	function onInstall() {
 		global $conf;
 		return $conf['services']['web'];
 	}
 
-
-	/*
-		This function is called when the plugin is loaded
-	*/
+	/**
+	 *
+	 */
 	function onLoad() {
 		global $app;
 
-		/*
-		Register for the events
-		*/
 		$app->plugins->registerEvent('web_domain_insert',$this->plugin_name,'ssl');
 		$app->plugins->registerEvent('web_domain_update',$this->plugin_name,'ssl');
 		$app->plugins->registerEvent('web_domain_delete',$this->plugin_name,'ssl');
@@ -65,12 +71,6 @@ class nginx_reverse_proxy_plugin {
 		$app->plugins->registerEvent('server_ip_insert',$this->plugin_name,'server_ip');
 		$app->plugins->registerEvent('server_ip_update',$this->plugin_name,'server_ip');
 		$app->plugins->registerEvent('server_ip_delete',$this->plugin_name,'server_ip');
-
-		/*
-		$app->plugins->registerEvent('webdav_user_insert',$this->plugin_name,'webdav');
-		$app->plugins->registerEvent('webdav_user_update',$this->plugin_name,'webdav');
-		$app->plugins->registerEvent('webdav_user_delete',$this->plugin_name,'webdav');
-		*/
 
 		$app->plugins->registerEvent('client_delete',$this->plugin_name,'client_delete');
 
@@ -174,7 +174,9 @@ class nginx_reverse_proxy_plugin {
 		$this->update($event_name, $data);
 	}
 
-
+	/**
+	 *
+	 */
 	function update($event_name,$data) {
 		global $app, $conf;
 
@@ -765,41 +767,6 @@ class nginx_reverse_proxy_plugin {
 			$app->system->chgrp('/var/log/ispconfig/httpd/'.$data['new']['domain'].'/error.log','root');
 		}
 
-		// Change the ownership of the error log to the owner of the website
-		/*
-		if (!@is_file($data['new']['document_root'].'/log/error.log')) exec('touch '.escapeshellcmd($data['new']['document_root']).'/log/error.log');
-		$app->system->chown($data['new']['document_root'].'/log/error.log',$username);
-		$app->system->chgrp($data['new']['document_root'].'/log/error.log',$groupname);
-		*/
-
-		/*
-		//* Write the custom php.ini file, if custom_php_ini filed is not empty
-		$custom_php_ini_dir = $web_config['website_basedir'].'/conf/'.$data['new']['system_user'];
-		if (!is_dir($web_config['website_basedir'].'/conf')) mkdir($web_config['website_basedir'].'/conf');
-		if (trim($data['new']['custom_php_ini']) != '') {
-			$has_custom_php_ini = true;
-			if (!is_dir($custom_php_ini_dir)) $app->system->mkdirpath($custom_php_ini_dir);
-			$php_ini_content = '';
-			if ($data['new']['php'] == 'mod') {
-				$master_php_ini_path = $web_config['php_ini_path_apache'];
-			} else {
-				if ($data["new"]['php'] == 'fast-cgi' && file_exists($fastcgi_config["fastcgi_phpini_path"])) {
-					$master_php_ini_path = $fastcgi_config["fastcgi_phpini_path"];
-				} else {
-					$master_php_ini_path = $web_config['php_ini_path_cgi'];
-				}
-			}
-			if ($master_php_ini_path != '' && substr($master_php_ini_path,-7) == 'php.ini' && is_file($master_php_ini_path)) {
-				$php_ini_content .= $app->system->file_get_contents($master_php_ini_path)."\n";
-			}
-			$php_ini_content .= str_replace("\r",'',trim($data['new']['custom_php_ini']));
-			$app->system->file_put_contents($custom_php_ini_dir.'/php.ini',$php_ini_content);
-		} else {
-			$has_custom_php_ini = false;
-			if (is_file($custom_php_ini_dir.'/php.ini')) $app->system->unlink($custom_php_ini_dir.'/php.ini');
-		}
-		*/
-
 		//* Create the vhost config file
 		$app->load('tpl');
 
@@ -833,15 +800,6 @@ class nginx_reverse_proxy_plugin {
 
 		// PHP-FPM
 		// Support for multiple PHP versions
-		/*
-		if (trim($data['new']['fastcgi_php_version']) != '') {
-			$default_php_fpm = false;
-			list($custom_php_fpm_name, $custom_php_fpm_init_script, $custom_php_fpm_ini_dir, $custom_php_fpm_pool_dir) = explode(':', trim($data['new']['fastcgi_php_version']));
-			if (substr($custom_php_fpm_ini_dir,-1) != '/') $custom_php_fpm_ini_dir .= '/';
-		} else {
-			$default_php_fpm = true;
-		}
-		*/
 		if ($data['new']['php'] != 'no') {
 			if (trim($data['new']['fastcgi_php_version']) != '') {
 				$default_php_fpm = false;
@@ -902,22 +860,6 @@ class nginx_reverse_proxy_plugin {
 		if ($vhost_data['php'] == 'fast-cgi') {
 			$vhost_data['php'] = 'php-fpm';
 		}
-
-		// Custom rewrite rules
-		/*
-		$final_rewrite_rules = array();
-		$custom_rewrite_rules = $data['new']['rewrite_rules'];
-		// Make sure we only have Unix linebreaks
-		$custom_rewrite_rules = str_replace("\r\n", "\n", $custom_rewrite_rules);
-		$custom_rewrite_rules = str_replace("\r", "\n", $custom_rewrite_rules);
-		$custom_rewrite_rule_lines = explode("\n", $custom_rewrite_rules);
-		if (is_array($custom_rewrite_rule_lines) && !empty($custom_rewrite_rule_lines)) {
-			foreach($custom_rewrite_rule_lines as $custom_rewrite_rule_line) {
-				$final_rewrite_rules[] = array('rewrite_rule' => $custom_rewrite_rule_line);
-			}
-		}
-		$tpl->setLoop('rewrite_rules', $final_rewrite_rules);
-		*/
 
 		// Custom rewrite rules
 		$final_rewrite_rules = array();
@@ -1880,6 +1822,9 @@ class nginx_reverse_proxy_plugin {
 
 	}
 
+	/**
+	 *
+	 */
 	function delete($event_name,$data) {
 		global $app, $conf;
 
@@ -1909,22 +1854,6 @@ class nginx_reverse_proxy_plugin {
 			if ($tmp['domain'] != '') {
 				$subdomain_host = preg_replace('/^(.*)\.' . preg_quote($tmp['domain'], '/') . '$/', '$1', $data['old']['domain']);
 			} else {
-				// get log folder from /etc/fstab
-				/*
-				$bind_mounts = $app->system->file_get_contents('/etc/fstab');
-				$bind_mount_lines = explode("\n", $bind_mounts);
-				if (is_array($bind_mount_lines) && !empty($bind_mount_lines)) {
-					foreach($bind_mount_lines as $bind_mount_line) {
-						$bind_mount_line = preg_replace('/\s+/', ' ', $bind_mount_line);
-						$bind_mount_parts = explode(' ', $bind_mount_line);
-						if (is_array($bind_mount_parts) && !empty($bind_mount_parts)) {
-							if ($bind_mount_parts[0] == '/var/log/ispconfig/httpd/'.$data['old']['domain'] && $bind_mount_parts[2] == 'none' && strpos($bind_mount_parts[3], 'bind') !== false) {
-								$subdomain_host = str_replace($data['old']['document_root'].'/log/', '', $bind_mount_parts[1]);
-							}
-						}
-					}
-				}
-				*/
 				// we are deleting the parent domain, so we can delete everything in the log directory
 				$subdomain_hosts = array();
 				$files = array_diff(scandir($data['old']['document_root'].'/'.$log_folder), array('.','..'));
@@ -2212,13 +2141,17 @@ class nginx_reverse_proxy_plugin {
 		}
 	}
 
-	//* This function is called when a IP on the server is inserted, updated or deleted
-	function server_ip($event_name,$data) {
+	/**
+	 *
+	 */
+	function server_ip($event_name, $data) {
 		return;
 	}
 
-	//* Create or update the .htaccess folder protection
-	function web_folder_user($event_name,$data) {
+	/**
+	 *
+	 */
+	function web_folder_user($event_name, $data) {
 		global $app, $conf;
 
 		$app->uses('system');
@@ -2279,19 +2212,6 @@ class nginx_reverse_proxy_plugin {
 			$app->log('Created file '.$folder_path.'.htpasswd',LOGLEVEL_DEBUG);
 		}
 
-		/*
-		$auth_users = $app->db->queryAllRecords("SELECT * FROM web_folder_user WHERE active = 'y' AND web_folder_id = ".intval($folder_id));
-		$htpasswd_content = '';
-		if (is_array($auth_users) && !empty($auth_users)) {
-			foreach($auth_users as $auth_user) {
-				$htpasswd_content .= $auth_user['username'].':'.$auth_user['password']."\n";
-			}
-		}
-		$htpasswd_content = trim($htpasswd_content);
-		@file_put_contents($folder_path.'.htpasswd', $htpasswd_content);
-		$app->log('Changed .htpasswd file: '.$folder_path.'.htpasswd',LOGLEVEL_DEBUG);
-		*/
-
 		if (($data['new']['username'] != $data['old']['username'] || $data['new']['active'] == 'n') && $data['old']['username'] != '') {
 			$app->system->removeLine($folder_path.'.htpasswd',$data['old']['username'].':');
 			$app->log('Removed user: '.$data['old']['username'],LOGLEVEL_DEBUG);
@@ -2313,8 +2233,10 @@ class nginx_reverse_proxy_plugin {
 		$this->update('web_domain_update', $webdata);
 	}
 
-	//* Remove .htpasswd file, when folder protection is removed
-	function web_folder_delete($event_name,$data) {
+	/**
+	 *
+	 */
+	function web_folder_delete($event_name, $data) {
 		global $app, $conf;
 
 		$folder_id = $data['old']['web_folder_id'];
@@ -2364,7 +2286,9 @@ class nginx_reverse_proxy_plugin {
 		$this->update('web_domain_update', $webdata);
 	}
 
-	//* Update folder protection, when path has been changed
+	/**
+	 *
+	 */
 	function web_folder_update($event_name,$data) {
 		global $app, $conf;
 
@@ -2449,6 +2373,9 @@ class nginx_reverse_proxy_plugin {
 		$this->update('web_domain_update', $webdata);
 	}
 
+	/**
+	 *
+	 */
 	function _create_web_folder_auth_configuration($website) {
 		global $app, $conf;
 
@@ -2456,9 +2383,7 @@ class nginx_reverse_proxy_plugin {
 		$app->uses('getconf');
 		$web_config = $app->getconf->get_server_config($conf['server_id'], 'web');
 		$basic_auth_file = escapeshellcmd($web_config['nginx_vhost_conf_dir'].'/'.$website['domain'].'.auth');
-		//$app->load('tpl');
-		//$tpl = new tpl();
-		//$tpl->newTemplate('nginx_http_authentication.auth.master');
+
 		$website_auth_locations = $app->db->queryAllRecords("SELECT * FROM web_folder WHERE active = 'y' AND parent_domain_id = ".intval($website['domain_id']));
 		$basic_auth_locations = array();
 
@@ -2482,343 +2407,11 @@ class nginx_reverse_proxy_plugin {
 		}
 
 		return $basic_auth_locations;
-		//$tpl->setLoop('basic_auth_locations', $basic_auth_locations);
-		//file_put_contents($basic_auth_file,$tpl->grab());
-		//$app->log('Writing the http basic authentication file: '.$basic_auth_file,LOGLEVEL_DEBUG);
-		//unset($tpl);
-		//$app->services->restartServiceDelayed('httpd','reload');
 	}
 
-	//* Update the awstats configuration file
-	private function awstats_update ($data,$web_config) {
-		global $app;
-
-		$web_folder = $data['new']['web_folder'];
-
-		if ($data['new']['type'] == 'vhost') {
-			$web_folder = 'web';
-		}
-
-		$awstats_conf_dir = $web_config['awstats_conf_dir'];
-
-		if (!is_dir($data['new']['document_root']."/" . $web_folder . "/stats/")) {
-			mkdir($data['new']['document_root']."/" . $web_folder . "/stats");
-		}
-
-		if (!@is_file($awstats_conf_dir.'/awstats.'.$data['new']['domain'].'.conf') || ($data['old']['domain'] != '' && $data['new']['domain'] != $data['old']['domain'])) {
-			if (@is_file($awstats_conf_dir.'/awstats.'.$data['old']['domain'].'.conf')) {
-				$app->system->unlink($awstats_conf_dir.'/awstats.'.$data['old']['domain'].'.conf');
-			}
-
-			$content = '';
-			$content .= "Include \"".$awstats_conf_dir."/awstats.conf\"\n";
-			$content .= "LogFile=\"/var/log/ispconfig/httpd/".$data['new']['domain']."/access.log\"\n";
-			$content .= "SiteDomain=\"".$data['new']['domain']."\"\n";
-			$content .= "HostAliases=\"www.".$data['new']['domain']."  localhost 127.0.0.1\"\n";
-
-			$app->system->file_put_contents($awstats_conf_dir.'/awstats.'.$data['new']['domain'].'.conf',$content);
-			$app->log('Created AWStats config file: '.$awstats_conf_dir.'/awstats.'.$data['new']['domain'].'.conf',LOGLEVEL_DEBUG);
-		}
-
-		if (is_file($data['new']['document_root']."/" . $web_folder . "/stats/index.html")) {
-			$app->system->unlink($data['new']['document_root']."/" . $web_folder . "/stats/index.html");
-		}
-
-		if (file_exists("/usr/local/ispconfig/server/conf-custom/awstats_index.php.master")) {
-			$app->system->copy("/usr/local/ispconfig/server/conf-custom/awstats_index.php.master",$data['new']['document_root']."/" . $web_folder . "/stats/index.php");
-		} else {
-			$app->system->copy("/usr/local/ispconfig/server/conf/awstats_index.php.master",$data['new']['document_root']."/" . $web_folder . "/stats/index.php");
-		}
-	}
-
-	//* Delete the awstats configuration file
-	private function awstats_delete ($data,$web_config) {
-		global $app;
-
-		$awstats_conf_dir = $web_config['awstats_conf_dir'];
-
-		if (@is_file($awstats_conf_dir.'/awstats.'.$data['old']['domain'].'.conf')) {
-			$app->system->unlink($awstats_conf_dir.'/awstats.'.$data['old']['domain'].'.conf');
-			$app->log('Removed AWStats config file: '.$awstats_conf_dir.'/awstats.'.$data['old']['domain'].'.conf',LOGLEVEL_DEBUG);
-		}
-	}
-
-	//* Update the PHP-FPM pool configuration file
-	private function php_fpm_pool_update ($data,$web_config,$pool_dir,$pool_name,$socket_dir) {
-		global $app, $conf;
-		/*
-		if (trim($data['new']['fastcgi_php_version']) != '') {
-			$default_php_fpm = false;
-			list($custom_php_fpm_name, $custom_php_fpm_init_script, $custom_php_fpm_ini_dir, $custom_php_fpm_pool_dir) = explode(':', trim($data['new']['fastcgi_php_version']));
-			if (substr($custom_php_fpm_ini_dir,-1) != '/') $custom_php_fpm_ini_dir .= '/';
-		} else {
-			$default_php_fpm = true;
-		}
-		*/
-		if ($data['new']['php'] != 'no') {
-			if (trim($data['new']['fastcgi_php_version']) != '') {
-				$default_php_fpm = false;
-				list($custom_php_fpm_name, $custom_php_fpm_init_script, $custom_php_fpm_ini_dir, $custom_php_fpm_pool_dir) = explode(':', trim($data['new']['fastcgi_php_version']));
-
-				if (substr($custom_php_fpm_ini_dir,-1) != '/') {
-					$custom_php_fpm_ini_dir .= '/';
-				}
-			} else {
-				$default_php_fpm = true;
-			}
-		} else {
-			if (trim($data['old']['fastcgi_php_version']) != '' && $data['old']['php'] != 'no') {
-				$default_php_fpm = false;
-				list($custom_php_fpm_name, $custom_php_fpm_init_script, $custom_php_fpm_ini_dir, $custom_php_fpm_pool_dir) = explode(':', trim($data['old']['fastcgi_php_version']));
-
-				if (substr($custom_php_fpm_ini_dir,-1) != '/') {
-					$custom_php_fpm_ini_dir .= '/';
-				}
-			} else {
-				$default_php_fpm = true;
-			}
-		}
-
-		$app->uses("getconf");
-		$web_config = $app->getconf->get_server_config($conf["server_id"], 'web');
-
-		if ($data['new']['php'] == 'no') {
-			if (@is_file($pool_dir.$pool_name.'.conf')) {
-				$app->system->unlink($pool_dir.$pool_name.'.conf');
-				//$reload = true;
-			}
-
-			if ($data['old']['php'] != 'no') {
-				if (!$default_php_fpm) {
-					$app->services->restartService('php-fpm','reload:'.$custom_php_fpm_init_script);
-				} else {
-					$app->services->restartService('php-fpm','reload:'.$conf['init_scripts'].'/'.$web_config['php_fpm_init_script']);
-				}
-			}
-
-			return;
-		}
-
-		$app->load('tpl');
-		$tpl = new tpl();
-		$tpl->newTemplate('php_fpm_pool.conf.master');
-
-		if ($data['new']['php_fpm_use_socket'] == 'y') {
-			$use_tcp = 0;
-			$use_socket = 1;
-
-			if (!is_dir($socket_dir)) {
-				$app->system->mkdirpath($socket_dir);
-			}
-		} else {
-			$use_tcp = 1;
-			$use_socket = 0;
-		}
-
-		$tpl->setVar('use_tcp', $use_tcp);
-		$tpl->setVar('use_socket', $use_socket);
-
-		$fpm_socket = $socket_dir.$pool_name.'.sock';
-		$tpl->setVar('fpm_socket', $fpm_socket);
-
-		$tpl->setVar('fpm_pool', $pool_name);
-		$tpl->setVar('fpm_port', $web_config['php_fpm_start_port'] + $data['new']['domain_id'] - 1);
-		$tpl->setVar('fpm_user', $data['new']['system_user']);
-		$tpl->setVar('fpm_group', $data['new']['system_group']);
-		$tpl->setVar('pm', $data['new']['pm']);
-		$tpl->setVar('pm_max_children', $data['new']['pm_max_children']);
-		$tpl->setVar('pm_start_servers', $data['new']['pm_start_servers']);
-		$tpl->setVar('pm_min_spare_servers', $data['new']['pm_min_spare_servers']);
-		$tpl->setVar('pm_max_spare_servers', $data['new']['pm_max_spare_servers']);
-		$tpl->setVar('pm_process_idle_timeout', $data['new']['pm_process_idle_timeout']);
-		$tpl->setVar('pm_max_requests', $data['new']['pm_max_requests']);
-		$tpl->setVar('document_root', $data['new']['document_root']);
-		$tpl->setVar('security_level',$web_config['security_level']);
-		$php_open_basedir = ($data['new']['php_open_basedir'] == '')?escapeshellcmd($data['new']['document_root']):escapeshellcmd($data['new']['php_open_basedir']);
-		$tpl->setVar('php_open_basedir', $php_open_basedir);
-
-		if ($php_open_basedir != '') {
-			$tpl->setVar('enable_php_open_basedir', '');
-		} else {
-			$tpl->setVar('enable_php_open_basedir', ';');
-		}
-
-		// Custom php.ini settings
-		$final_php_ini_settings = array();
-		$custom_php_ini_settings = trim($data['new']['custom_php_ini']);
-
-		if ($custom_php_ini_settings != '') {
-			// Make sure we only have Unix linebreaks
-			$custom_php_ini_settings = str_replace("\r\n", "\n", $custom_php_ini_settings);
-			$custom_php_ini_settings = str_replace("\r", "\n", $custom_php_ini_settings);
-			$ini_settings = explode("\n", $custom_php_ini_settings);
-
-			if (is_array($ini_settings) && !empty($ini_settings)) {
-				foreach ($ini_settings as $ini_setting) {
-					$ini_setting = trim($ini_setting);
-
-					if (substr($ini_setting,0,1) == ';') {
-						continue;
-					}
-
-					if (substr($ini_setting,0,1) == '#') {
-						continue;
-					}
-
-					if (substr($ini_setting,0,2) == '//') {
-						continue;
-					}
-
-					list($key, $value) = explode('=', $ini_setting);
-
-					if ($value) {
-						$value = trim($value);
-						$key = trim($key);
-
-						switch (strtolower($value)) {
-							case '0':
-								// PHP-FPM might complain about invalid boolean value if you use 0
-								$value = 'off';
-							case '1':
-							case 'on':
-							case 'off':
-							case 'true':
-							case 'false':
-							case 'yes':
-							case 'no':
-								$final_php_ini_settings[] = array('ini_setting' => 'php_admin_flag['.$key.'] = '.$value);
-								break;
-							default:
-								$final_php_ini_settings[] = array('ini_setting' => 'php_admin_value['.$key.'] = '.$value);
-						}
-					}
-				}
-			}
-		}
-
-		$tpl->setLoop('custom_php_ini_settings', $final_php_ini_settings);
-
-		$app->system->file_put_contents($pool_dir.$pool_name.'.conf',$tpl->grab());
-		$app->log('Writing the PHP-FPM config file: '.$pool_dir.$pool_name.'.conf',LOGLEVEL_DEBUG);
-		unset($tpl);
-
-		// delete pool in all other PHP versions
-		$default_pool_dir = escapeshellcmd($web_config['php_fpm_pool_dir']);
-
-		if (substr($default_pool_dir,-1) != '/') {
-			$default_pool_dir .= '/';
-		}
-
-		if ($default_pool_dir != $pool_dir) {
-			if (@is_file($default_pool_dir.$pool_name.'.conf')) {
-					$app->system->unlink($default_pool_dir.$pool_name.'.conf');
-					$app->log('Removed PHP-FPM config file: '.$default_pool_dir.$pool_name.'.conf',LOGLEVEL_DEBUG);
-					$app->services->restartService('php-fpm','reload:'.$conf['init_scripts'].'/'.$web_config['php_fpm_init_script']);
-			}
-		}
-
-		$php_versions = $app->db->queryAllRecords("SELECT * FROM server_php WHERE php_fpm_init_script != '' AND php_fpm_ini_dir != '' AND php_fpm_pool_dir != '' AND server_id = ".$conf["server_id"]);
-
-		if (is_array($php_versions) && !empty($php_versions)) {
-			foreach ($php_versions as $php_version) {
-				if (substr($php_version['php_fpm_pool_dir'],-1) != '/') {
-					$php_version['php_fpm_pool_dir'] .= '/';
-				}
-
-				if ($php_version['php_fpm_pool_dir'] != $pool_dir) {
-					if (@is_file($php_version['php_fpm_pool_dir'].$pool_name.'.conf') ) {
-						$app->system->unlink($php_version['php_fpm_pool_dir'].$pool_name.'.conf');
-						$app->log('Removed PHP-FPM config file: '.$php_version['php_fpm_pool_dir'].$pool_name.'.conf',LOGLEVEL_DEBUG);
-						$app->services->restartService('php-fpm','reload:'.$php_version['php_fpm_init_script']);
-					}
-				}
-			}
-		}
-
-		// Reload current PHP-FPM after all others
-		sleep(1);
-
-		if (!$default_php_fpm) {
-			$app->services->restartService('php-fpm','reload:'.$custom_php_fpm_init_script);
-		} else {
-			$app->services->restartService('php-fpm','reload:'.$conf['init_scripts'].'/'.$web_config['php_fpm_init_script']);
-		}
-	}
-
-	//* Delete the PHP-FPM pool configuration file
-	private function php_fpm_pool_delete ($data,$web_config) {
-		global $app, $conf;
-
-		if (trim($data['old']['fastcgi_php_version']) != '' && $data['old']['php'] != 'no') {
-			$default_php_fpm = false;
-			list($custom_php_fpm_name, $custom_php_fpm_init_script, $custom_php_fpm_ini_dir, $custom_php_fpm_pool_dir) = explode(':', trim($data['old']['fastcgi_php_version']));
-
-			if (substr($custom_php_fpm_ini_dir,-1) != '/') {
-				$custom_php_fpm_ini_dir .= '/';
-			}
-		} else {
-			$default_php_fpm = true;
-		}
-
-		if ($default_php_fpm) {
-			$pool_dir = escapeshellcmd($web_config['php_fpm_pool_dir']);
-		} else {
-			$pool_dir = $custom_php_fpm_pool_dir;
-		}
-
-		if (substr($pool_dir,-1) != '/') {
-			$pool_dir .= '/';
-		}
-
-		$pool_name = 'web'.$data['old']['domain_id'];
-
-		if (@is_file($pool_dir.$pool_name.'.conf')) {
-			$app->system->unlink($pool_dir.$pool_name.'.conf');
-			$app->log('Removed PHP-FPM config file: '.$pool_dir.$pool_name.'.conf',LOGLEVEL_DEBUG);
-		}
-
-		// delete pool in all other PHP versions
-		$default_pool_dir = escapeshellcmd($web_config['php_fpm_pool_dir']);
-		if (substr($default_pool_dir,-1) != '/') {
-			$default_pool_dir .= '/';
-		}
-
-		if ($default_pool_dir != $pool_dir) {
-			if (@is_file($default_pool_dir.$pool_name.'.conf')) {
-					$app->system->unlink($default_pool_dir.$pool_name.'.conf');
-					$app->log('Removed PHP-FPM config file: '.$default_pool_dir.$pool_name.'.conf',LOGLEVEL_DEBUG);
-					$app->services->restartService('php-fpm','reload:'.$conf['init_scripts'].'/'.$web_config['php_fpm_init_script']);
-			}
-		}
-
-		$php_versions = $app->db->queryAllRecords("SELECT * FROM server_php WHERE php_fpm_init_script != '' AND php_fpm_ini_dir != '' AND php_fpm_pool_dir != '' AND server_id = ".$data['old']['server_id']);
-
-		if (is_array($php_versions) && !empty($php_versions)) {
-			foreach ($php_versions as $php_version) {
-				if (substr($php_version['php_fpm_pool_dir'],-1) != '/') {
-					$php_version['php_fpm_pool_dir'] .= '/';
-				}
-
-				if ($php_version['php_fpm_pool_dir'] != $pool_dir) {
-					if (@is_file($php_version['php_fpm_pool_dir'].$pool_name.'.conf')) {
-						$app->system->unlink($php_version['php_fpm_pool_dir'].$pool_name.'.conf');
-						$app->log('Removed PHP-FPM config file: '.$php_version['php_fpm_pool_dir'].$pool_name.'.conf',LOGLEVEL_DEBUG);
-						$app->services->restartService('php-fpm','reload:'.$php_version['php_fpm_init_script']);
-					}
-				}
-			}
-		}
-
-		// Reload current PHP-FPM after all others
-		sleep(1);
-
-		if (!$default_php_fpm) {
-			$app->services->restartService('php-fpm','reload:'.$custom_php_fpm_init_script);
-		} else {
-			$app->services->restartService('php-fpm','reload:'.$conf['init_scripts'].'/'.$web_config['php_fpm_init_script']);
-		}
-	}
-
+	/**
+	 *
+	 */
 	private function nginx_replace($matches) {
 		$location = 'location'.($matches[1] != '' ? ' '.$matches[1] : '').' '.$matches[2].' '.$matches[3];
 
@@ -2833,6 +2426,9 @@ class nginx_reverse_proxy_plugin {
 		return $location;
 	}
 
+	/**
+	 *
+	 */
 	private function nginx_merge_locations($vhost_conf) {
 		$lines = explode("\n", $vhost_conf);
 
@@ -2848,23 +2444,6 @@ class nginx_reverse_proxy_plugin {
 				}
 
 				$lines[$h] = rtrim($lines[$h]);
-				/*
-				if (substr(ltrim($lines[$h]), 0, 8) == 'location' && strpos($lines[$h], '{') !== false && strpos($lines[$h], ';') !== false) {
-					$lines[$h] = str_replace("{", "{\n", $lines[$h]);
-					$lines[$h] = str_replace(";", ";\n", $lines[$h]);
-					if (strpos($lines[$h], '##merge##') !== false) {
-						$lines[$h] = str_replace('##merge##', '', $lines[$h]);
-						$lines[$h] = substr($lines[$h],0,strpos($lines[$h], '{')).' ##merge##'.substr($lines[$h],strpos($lines[$h], '{')+1);
-					}
-				}
-				if (substr(ltrim($lines[$h]), 0, 8) == 'location' && strpos($lines[$h], '{') !== false && strpos($lines[$h], '}') !== false && strpos($lines[$h], ';') === false) {
-					$lines[$h] = str_replace("{", "{\n", $lines[$h]);
-					if (strpos($lines[$h], '##merge##') !== false) {
-						$lines[$h] = str_replace('##merge##', '', $lines[$h]);
-						$lines[$h] = substr($lines[$h],0,strpos($lines[$h], '{')).' ##merge##'.substr($lines[$h],strpos($lines[$h], '{')+1);
-					}
-				}
-				*/
 				$pattern = '/^[^\S\n]*location[^\S\n]+(?:(.+)[^\S\n]+)?(.+)[^\S\n]*(\{)[^\S\n]*(##merge##)?[^\S\n]*(.+)[^\S\n]*(\})[^\S\n]*(##merge##)?[^\S\n]*$/';
 				$lines[$h] = preg_replace_callback($pattern, array($this, 'nginx_replace') ,$lines[$h]);
 			}
@@ -2974,41 +2553,52 @@ class nginx_reverse_proxy_plugin {
 	 */
 	function client_delete($event_name, $data) {}
 
-	//* Wrapper for exec function for easier debugging
+	/**
+	 *
+	 */
 	private function _exec($command) {
 		global $app;
 
-		$app->log('exec: '.$command,LOGLEVEL_DEBUG);
+		$app->log('exec: '.$command, LOGLEVEL_DEBUG);
 		exec($command);
 	}
 
-	private function _checkTcp($host,$port) {
-		$fp = @fsockopen ($host, $port, $errno, $errstr, 2);
+	/**
+	 *
+	 */
+	private function _checkTcp($host, $port) {
+		$fp = @fsockopen($host, $port, $errno, $errstr, 2);
 
 		if ($fp) {
-			fclose($fp);
+			@fclose($fp);
 			return true;
 		}
 
 		return false;
 	}
 
+	/**
+	 *
+	 */
 	public function create_relative_link($f, $t) {
 		global $app;
-		// $from already exists
+
 		$from = realpath($f);
 
 		// realpath requires the traced file to exist - so, lets touch it first, then remove
-		@$app->system->unlink($t); touch($t);
+		@$app->system->unlink($t);
+		touch($t);
 		$to = realpath($t);
 		@$app->system->unlink($t);
 
 		// Remove from the left side matching path elements from $from and $to
 		// and get path elements counts
-		$a1 = explode('/', $from); $a2 = explode('/', $to);
+		$a1 = explode('/', $from);
+		$a2 = explode('/', $to);
 
 		for ($c = 0; $a1[$c] == $a2[$c]; $c++) {
-			unset($a1[$c]); unset($a2[$c]);
+			unset($a1[$c]);
+			unset($a2[$c]);
 		}
 
 		$cfrom = implode('/', $a1);
@@ -3019,107 +2609,24 @@ class nginx_reverse_proxy_plugin {
 		}
 
 		// Add ($cnt_to-1) number of "../" elements to left side of $cfrom
-		for ($c = 0; $c < (count($a2)-1); $c++) {
+		for ($c = 0; $c < (count($a2) - 1); $c++) {
 			$cfrom = '../'.$cfrom;
 		}
 
 		return symlink($cfrom, $to);
 	}
 
+	/**
+	 *
+	 */
 	private function _rewrite_quote($string) {
 		return str_replace(array('.', '*', '?', '+'), array('\\.', '\\*', '\\?', '\\+'), $string);
 	}
 
-	private function url_is_local($hostname, $domain_id) {
-		global $app;
-
-		// ORDER BY clause makes sure wildcard subdomains (*) are listed last in the result array so that we can find direct matches first
-		$webs = $app->db->queryAllRecords("SELECT * FROM web_domain WHERE active = 'y' ORDER BY subdomain ASC");
-
-		if (is_array($webs) && !empty($webs)) {
-			foreach ($webs as $web) {
-				// web domain doesn't match hostname
-				if (substr($hostname,-strlen($web['domain'])) != $web['domain']) {
-					continue;
-				}
-				// own vhost and therefore server {} container of its own
-				//if ($web['type'] == 'vhostsubdomain') continue;
-				// alias domains/subdomains using rewrites and therefore a server {} container of their own
-				//if (($web['type'] == 'alias' || $web['type'] == 'subdomain') && $web['redirect_type'] != '' && $web['redirect_path'] != '') continue;
-
-				if ($web['subdomain'] == '*') {
-					$pattern = '/\.?'.str_replace('.', '\.', $web['domain']).'$/i';
-				}
-
-				if ($web['subdomain'] == 'none') {
-					if ($web['domain'] == $hostname) {
-						if ($web['domain_id'] == $domain_id || $web['parent_domain_id'] == $domain_id) {
-							// own vhost and therefore server {} container of its own
-							if ($web['type'] == 'vhostsubdomain') {
-								return false;
-							}
-
-							// alias domains/subdomains using rewrites and therefore a server {} container of their own
-							if (($web['type'] == 'alias' || $web['type'] == 'subdomain') && $web['redirect_type'] != '' && $web['redirect_path'] != '') {
-								return false;
-							}
-
-							return true;
-						} else {
-							return false;
-						}
-					}
-
-					$pattern = '/^'.str_replace('.', '\.', $web['domain']).'$/i';
-				}
-
-				if ($web['subdomain'] == 'www') {
-					if ($web['domain'] == $hostname || $web['subdomain'].'.'.$web['domain'] == $hostname) {
-						if ($web['domain_id'] == $domain_id || $web['parent_domain_id'] == $domain_id) {
-							// own vhost and therefore server {} container of its own
-							if ($web['type'] == 'vhostsubdomain') {
-								return false;
-							}
-
-							// alias domains/subdomains using rewrites and therefore a server {} container of their own
-							if (($web['type'] == 'alias' || $web['type'] == 'subdomain') && $web['redirect_type'] != '' && $web['redirect_path'] != '') {
-								return false;
-							}
-
-							return true;
-						} else {
-							return false;
-						}
-					}
-
-					$pattern = '/^(www\.)?'.str_replace('.', '\.', $web['domain']).'$/i';
-				}
-
-				if (preg_match($pattern, $hostname)) {
-					if ($web['domain_id'] == $domain_id || $web['parent_domain_id'] == $domain_id) {
-						// own vhost and therefore server {} container of its own
-						if ($web['type'] == 'vhostsubdomain') {
-							return false;
-						}
-
-						// alias domains/subdomains using rewrites and therefore a server {} container of their own
-						if (($web['type'] == 'alias' || $web['type'] == 'subdomain') && $web['redirect_type'] != '' && $web['redirect_path'] != '') {
-							return false;
-						}
-
-						return true;
-					} else {
-						return false;
-					}
-				}
-			}
-		}
-
-		return false;
-	}
-
+	/**
+	 *
+	 */
 	private function get_seo_redirects($web, $prefix = '', $force_subdomain = false) {
-		// $force_subdomain = 'none|www'
 		$seo_redirects = array();
 
 		if (substr($web['domain'], 0, 2) === '*.') {
@@ -3134,8 +2641,6 @@ class nginx_reverse_proxy_plugin {
 			}
 
 			if ($web['seo_redirect'] == '*_domain_tld_to_www_domain_tld') {
-				// ^(example\.com|(?!\bwww\b)\.example\.com)$
-				// ^(example\.com|((?:\w+(?:-\w+)*\.)*)((?!www\.)\w+(?:-\w+)*)(\.example\.com))$
 				$seo_redirects[$prefix.'seo_redirect_origin_domain'] = '^('.str_replace('.', '\.', $web['domain']).'|((?:\w+(?:-\w+)*\.)*)((?!www\.)\w+(?:-\w+)*)(\.'.str_replace('.', '\.', $web['domain']).'))$';
 				$seo_redirects[$prefix.'seo_redirect_target_domain'] = 'www.'.$web['domain'];
 				$seo_redirects[$prefix.'seo_redirect_operator'] = '~*';
@@ -3156,7 +2661,6 @@ class nginx_reverse_proxy_plugin {
 			}
 
 			if ($web['seo_redirect'] == '*_domain_tld_to_domain_tld') {
-				// ^(.+)\.example\.com$
 				$seo_redirects[$prefix.'seo_redirect_origin_domain'] = '^(.+)\.'.str_replace('.', '\.', $web['domain']).'$';
 				$seo_redirects[$prefix.'seo_redirect_target_domain'] = $web['domain'];
 				$seo_redirects[$prefix.'seo_redirect_operator'] = '~*';
