@@ -28,15 +28,6 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-/**
- * ISPConfig3 Nginx Reverse Proxy.
- *
- * This class extends ISPConfig's vhost management with the functionality to run
- * Nginx in front of Apache2 as a transparent reverse proxy.
- *
- * @author Rackster Internet Services <open-source@rackster.ch>
- * @link https://open-source.rackster.ch/project/ispconfig3-nginx-reverse-proxy
- */
 class nginx_reverse_proxy_plugin {
 
 	var $plugin_name = 'nginx_reverse_proxy_plugin';
@@ -45,24 +36,12 @@ class nginx_reverse_proxy_plugin {
 	var $action = '';
 
 
-	/**
-	 * ISPConfig onInstall hook.
-	 *
-	 * Called during ISPConfig installation to determine if a symlink shall be created.
-	 *
-	 * @return bool create symlink if true
-	 */
 	function onInstall() {
 		global $conf;
 
 		return $conf['services']['web'];
 	}
 
-	/**
-	 * ISPConfig onLoad hook.
-	 *
-	 * Register the plugin for some site related events.
-	 */
 	function onLoad() {
 		global $app;
 
@@ -74,8 +53,6 @@ class nginx_reverse_proxy_plugin {
 		$app->plugins->registerEvent('web_domain_update',$this->plugin_name,'update');
 		$app->plugins->registerEvent('web_domain_delete',$this->plugin_name,'delete');
 
-		$app->plugins->registerEvent('client_delete',$this->plugin_name,'client_delete');
-
 		$app->plugins->registerEvent('web_folder_user_insert',$this->plugin_name,'web_folder_user');
 		$app->plugins->registerEvent('web_folder_user_update',$this->plugin_name,'web_folder_user');
 		$app->plugins->registerEvent('web_folder_user_delete',$this->plugin_name,'web_folder_user');
@@ -84,14 +61,6 @@ class nginx_reverse_proxy_plugin {
 		$app->plugins->registerEvent('web_folder_delete',$this->plugin_name,'web_folder_delete');
 	}
 
-	/**
-	 * ISPConfig ssl hook.
-	 *
-	 * Called every time something in the ssl tab is done.
-	 *
-	 * @param string $event_name the event/action name
-	 * @param array $data the vhost data
-	 */
 	function ssl($event_name, $data) {
 		global $app, $conf;
 
@@ -108,13 +77,12 @@ class nginx_reverse_proxy_plugin {
 
 		//* Ensure SSL dir exists (Apache2 should have created it)
 		if (!is_dir($ssl_dir)) {
-			$app->system->mkdirpath($ssl_dir);
-			$app->log("Creating SSL directory ".$ssl_dir, LOGLEVEL_DEBUG);
+			return;
 		}
 
 		//* Create a SSL Certificate (done by Apache2)
 		if ($data['new']['ssl_action'] == 'create' && $conf['mirror_server_id'] == 0) {
-			//* Rename files if they exist
+			//* Rename file if it exists
 			if (file_exists($crt_file)) {
 				$app->system->rename($crt_file, $crt_file.'.bak');
 				$app->log("Renaming old SSL cert ".$crt_file, LOGLEVEL_DEBUG);
@@ -167,14 +135,6 @@ class nginx_reverse_proxy_plugin {
 		}
 	}
 
-	/**
-	 * ISPConfig insert hook.
-	 *
-	 * Called every time a new site is created.
-	 *
-	 * @param string $event_name the event/action name
-	 * @param array $data the vhost data
-	 */
 	function insert($event_name, $data) {
 		global $app, $conf;
 
@@ -182,14 +142,6 @@ class nginx_reverse_proxy_plugin {
 		$this->update($event_name, $data);
 	}
 
-	/**
-	 * ISPConfig update hook.
-	 *
-	 * Called every time a site gets updated from within ISPConfig.
-	 *
-	 * @param string $event_name the event/action name
-	 * @param array $data the vhost data
-	 */
 	function update($event_name, $data) {
 		global $app, $conf;
 
@@ -227,7 +179,10 @@ class nginx_reverse_proxy_plugin {
 
 		// load the server configuration options
 		$app->uses('getconf');
+
 		$web_config = $app->getconf->get_server_config($conf['server_id'], 'web');
+		$web_config['nginx_vhost_conf_dir'] = "/etc/nginx/sites-available";
+		$web_config['nginx_vhost_conf_enabled_dir'] = "/etc/nginx/sites-enabled";
 
 		if ($data['new']['document_root'] == '') {
 			if ($data['new']['type'] == 'vhost' || $data['new']['type'] == 'vhostsubdomain') {
@@ -942,7 +897,7 @@ class nginx_reverse_proxy_plugin {
 			$app->log('Removing file: '.$vhost_file,LOGLEVEL_DEBUG);
 		}
 
-		$app->services->restartServiceDelayed('httpd','reload');
+		exec('/etc/init.d/nginx reload');
 
 		//* The vhost is written and apache has been restarted, so we
 		// can reset the ssl changed var to false and cleanup some files
@@ -977,6 +932,8 @@ class nginx_reverse_proxy_plugin {
 		$app->uses('system');
 
 		$web_config = $app->getconf->get_server_config($conf['server_id'], 'web');
+		$web_config['nginx_vhost_conf_dir'] = "/etc/nginx/sites-available";
+		$web_config['nginx_vhost_conf_enabled_dir'] = "/etc/nginx/sites-enabled";
 
 		if ($data['old']['type'] != 'vhost' && $data['old']['type'] != 'vhostsubdomain' && $data['old']['parent_domain_id'] > 0) {
 			//* This is a alias domain or subdomain, so we have to update the website instead
@@ -1203,7 +1160,8 @@ class nginx_reverse_proxy_plugin {
 	}
 
 	/**
-	 *
+	 * TODO
+	 * ::DONE::
 	 */
 	function _create_web_folder_auth_configuration($website) {
 		global $app, $conf;
@@ -1212,6 +1170,9 @@ class nginx_reverse_proxy_plugin {
 		$app->uses('getconf');
 
 		$web_config = $app->getconf->get_server_config($conf['server_id'], 'web');
+		$web_config['nginx_vhost_conf_dir'] = "/etc/nginx/sites-available";
+		$web_config['nginx_vhost_conf_enabled_dir'] = "/etc/nginx/sites-enabled";
+
 		$basic_auth_file = escapeshellcmd($web_config['nginx_vhost_conf_dir'].'/'.$website['domain'].'.auth');
 
 		$website_auth_locations = $app->db->queryAllRecords("SELECT * FROM web_folder WHERE active = 'y' AND parent_domain_id = ".intval($website['domain_id']));
@@ -1233,7 +1194,7 @@ class nginx_reverse_proxy_plugin {
 
 				$basic_auth_locations[] = array(
 					'htpasswd_location' => '/'.$website_auth_location['path'],
-					'htpasswd_path' => $website['document_root'].'/' . ($website['type'] == 'vhostsubdomain' ? $website['web_folder'] : 'web') . '/'.$website_auth_location['path']
+					'htpasswd_path' 	=> $website['document_root'].'/' . ($website['type'] == 'vhostsubdomain' ? $website['web_folder'] : 'web') . '/'.$website_auth_location['path']
 				);
 			}
 		}
@@ -1242,7 +1203,8 @@ class nginx_reverse_proxy_plugin {
 	}
 
 	/**
-	 *
+	 * TODO
+	 * ::DONE::
 	 */
 	private function nginx_replace($matches) {
 		$location = 'location'.($matches[1] != '' ? ' '.$matches[1] : '').' '.$matches[2].' '.$matches[3];
@@ -1259,7 +1221,8 @@ class nginx_reverse_proxy_plugin {
 	}
 
 	/**
-	 *
+	 * TODO
+	 * ::DONE::
 	 */
 	private function nginx_merge_locations($vhost_conf) {
 		$lines = explode("\n", $vhost_conf);
@@ -1270,7 +1233,7 @@ class nginx_reverse_proxy_plugin {
 
 			for ($h = 0; $h < $linecount; $h++) {
 				// remove comments
-				if (substr(trim($lines[$h]),0,1) == '#') {
+				if (substr(trim($lines[$h]), 0, 1) == '#') {
 					unset($lines[$h]);
 					continue;
 				}
@@ -1381,19 +1344,6 @@ class nginx_reverse_proxy_plugin {
 	}
 
 	/**
-	 * ISPConfig client delete hook.
-	 *
-	 * Called every time, a client gets deleted.
-	 *
-	 * @param string $event_name the event/action name
-	 * @param array $data the vhost data
-	 * @return void
-	 */
-	function client_delete($event_name, $data) {
-		return;
-	}
-
-	/**
 	 * ISPConfig internal debug method.
 	 *
 	 * @param string $command executable command to debug
@@ -1406,7 +1356,8 @@ class nginx_reverse_proxy_plugin {
 	}
 
 	/**
-	 *
+	 * TODO
+	 * ::DONE::
 	 */
 	public function create_relative_link($f, $t) {
 		global $app;
@@ -1445,14 +1396,16 @@ class nginx_reverse_proxy_plugin {
 	}
 
 	/**
-	 *
+	 * TODO
+	 * ::DONE::
 	 */
 	private function _rewrite_quote($string) {
 		return str_replace(array('.', '*', '?', '+'), array('\\.', '\\*', '\\?', '\\+'), $string);
 	}
 
 	/**
-	 *
+	 * TODO
+	 * ::DONE::
 	 */
 	private function get_seo_redirects($web, $prefix = '', $force_subdomain = false) {
 		$seo_redirects = array();
