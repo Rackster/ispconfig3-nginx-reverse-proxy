@@ -82,205 +82,58 @@ class nginx_reverse_proxy_plugin {
 		$app->plugins->registerEvent('web_folder_delete',$this->plugin_name,'web_folder_delete');
 	}
 
-	// Handle the creation of SSL certificates
-	function ssl($event_name,$data) {
+	/**
+	 *
+	 */
+	function ssl($event_name, $data) {
 		global $app, $conf;
 
 		$app->uses('system');
-
-		// load the server configuration options
-		$app->uses('getconf');
-		$web_config = $app->getconf->get_server_config($conf['server_id'], 'web');
-		if ($web_config['CA_path']!='' && !file_exists($web_config['CA_path'].'/openssl.cnf')) {
-			$app->log("CA path error, file does not exist:".$web_config['CA_path'].'/openssl.cnf',LOGLEVEL_ERROR);
-		}
 
 		//* Only vhosts can have a ssl cert
 		if ($data["new"]["type"] != "vhost" && $data["new"]["type"] != "vhostsubdomain") {
 			return;
 		}
 
-		// if (!is_dir($data['new']['document_root'].'/ssl')) exec('mkdir -p '.$data['new']['document_root'].'/ssl');
-		if (!is_dir($data['new']['document_root'].'/ssl')) {
-			$app->system->mkdirpath($data['new']['document_root'].'/ssl');
-		}
-
 		$ssl_dir = $data['new']['document_root'].'/ssl';
 		$domain = $data['new']['ssl_domain'];
-		$key_file = $ssl_dir.'/'.$domain.'.key.org';
-		$key_file2 = $ssl_dir.'/'.$domain.'.key';
-		$csr_file = $ssl_dir.'/'.$domain.'.csr';
-		$crt_file = $ssl_dir.'/'.$domain.'.crt';
+		$crt_file = $ssl_dir.'/'.$domain.'.nginx.crt';
 
-		//* Create a SSL Certificate
+		//* Ensure SSL dir exists (Apache2 should have created it)
+		if (!is_dir($ssl_dir)) {
+			$app->system->mkdirpath($ssl_dir);
+			$app->log("Creating SSL directory ".$ssl_dir, LOGLEVEL_DEBUG);
+		}
+
+		//* Create a SSL Certificate (done by Apache2)
 		if ($data['new']['ssl_action'] == 'create' && $conf['mirror_server_id'] == 0) {
 			$this->ssl_certificate_changed = true;
 
 			//* Rename files if they exist
-			if (file_exists($key_file)) {
-				$app->system->rename($key_file,$key_file.'.bak');
-				$app->system->chmod($key_file.'.bak',0400);
-			}
-
-			if (file_exists($key_file2)) {
-				$app->system->rename($key_file2,$key_file2.'.bak');
-				$app->system->chmod($key_file2.'.bak',0400);
-			}
-
-			if (file_exists($csr_file)) {
-				$app->system->rename($csr_file,$csr_file.'.bak');
-			}
-
 			if (file_exists($crt_file)) {
-				$app->system->rename($crt_file,$crt_file.'.bak');
+				$app->system->rename($crt_file, $crt_file.'.bak');
+				$app->log("Renaming old SSL cert ".$crt_file, LOGLEVEL_DEBUG);
 			}
-
-			$rand_file = $ssl_dir.'/random_file';
-			$rand_data = md5(uniqid(microtime(),1));
-
-			for ($i = 0; $i < 1000; $i++) {
-				$rand_data .= md5(uniqid(microtime(),1));
-				$rand_data .= md5(uniqid(microtime(),1));
-				$rand_data .= md5(uniqid(microtime(),1));
-				$rand_data .= md5(uniqid(microtime(),1));
-			}
-
-			$app->system->file_put_contents($rand_file, $rand_data);
-			$ssl_password = substr(md5(uniqid(microtime(),1)), 0, 15);
-			$ssl_cnf = "        RANDFILE               = $rand_file
-
-		[ req ]
-		default_bits           = 2048
-		default_keyfile        = keyfile.pem
-		distinguished_name     = req_distinguished_name
-		attributes             = req_attributes
-		prompt                 = no
-		output_password        = $ssl_password
-
-		[ req_distinguished_name ]
-		C                      = ".trim($data['new']['ssl_country'])."
-		ST                     = ".trim($data['new']['ssl_state'])."
-		L                      = ".trim($data['new']['ssl_locality'])."
-		O                      = ".trim($data['new']['ssl_organisation'])."
-		OU                     = ".trim($data['new']['ssl_organisation_unit'])."
-		CN                     = $domain
-		emailAddress           = webmaster@".$data['new']['domain']."
-
-		[ req_attributes ]
-		challengePassword              = A challenge password";
-
-			$ssl_cnf_file = $ssl_dir.'/openssl.conf';
-			$app->system->file_put_contents($ssl_cnf_file,$ssl_cnf);
-
-			$rand_file = escapeshellcmd($rand_file);
-			$key_file = escapeshellcmd($key_file);
-
-			if (substr($domain, 0, 2) == '*.' && strpos($key_file, '/ssl/\*.') != false) {
-				$key_file = str_replace('/ssl/\*.', '/ssl/*.', $key_file); // wildcard certificate
-			}
-
-			$key_file2 = escapeshellcmd($key_file2);
-
-			if (substr($domain, 0, 2) == '*.' && strpos($key_file2, '/ssl/\*.') != false) {
-				$key_file2 = str_replace('/ssl/\*.', '/ssl/*.', $key_file2); // wildcard certificate
-			}
-
-			$ssl_days = 3650;
-			$csr_file = escapeshellcmd($csr_file);
-
-			if (substr($domain, 0, 2) == '*.' && strpos($csr_file, '/ssl/\*.') != false) {
-				$csr_file = str_replace('/ssl/\*.', '/ssl/*.', $csr_file); // wildcard certificate
-			}
-
-			$config_file = escapeshellcmd($ssl_cnf_file);
-			$crt_file = escapeshellcmd($crt_file);
-
-			if (substr($domain, 0, 2) == '*.' && strpos($crt_file, '/ssl/\*.') != false) {
-				$crt_file = str_replace('/ssl/\*.', '/ssl/*.', $crt_file); // wildcard certificate
-			}
-
-			if (is_file($ssl_cnf_file) && !is_link($ssl_cnf_file)) {
-				exec("openssl genrsa -des3 -rand $rand_file -passout pass:$ssl_password -out $key_file 2048");
-				exec("openssl req -new -passin pass:$ssl_password -passout pass:$ssl_password -key $key_file -out $csr_file -days $ssl_days -config $config_file");
-				exec("openssl rsa -passin pass:$ssl_password -in $key_file -out $key_file2");
-
-				if (file_exists($web_config['CA_path'].'/openssl.cnf')) {
-					exec("openssl ca -batch -out $crt_file -config ".$web_config['CA_path']."/openssl.cnf -passin pass:".$web_config['CA_pass']." -in $csr_file");
-					$app->log("Creating CA-signed SSL Cert for: $domain",LOGLEVEL_DEBUG);
-
-					if (filesize($crt_file)==0 || !file_exists($crt_file)) {
-						$app->log("CA-Certificate signing failed.  openssl ca -out $crt_file -config ".$web_config['CA_path']."/openssl.cnf -passin pass:".$web_config['CA_pass']." -in $csr_file",LOGLEVEL_ERROR);
-					}
-				};
-
-				if (@filesize($crt_file)==0 || !file_exists($crt_file)) {
-					exec("openssl req -x509 -passin pass:$ssl_password -passout pass:$ssl_password -key $key_file -in $csr_file -out $crt_file -days $ssl_days -config $config_file ");
-					$app->log("Creating self-signed SSL Cert for: $domain",LOGLEVEL_DEBUG);
-				};
-
-			}
-
-			$app->system->chmod($key_file,0400);
-			$app->system->chmod($key_file2,0400);
-			@$app->system->unlink($config_file);
-			@$app->system->unlink($rand_file);
-			$ssl_request = $app->db->quote($app->system->file_get_contents($csr_file));
-			$ssl_cert = $app->db->quote($app->system->file_get_contents($crt_file));
-			$ssl_key2 = $app->db->quote($app->system->file_get_contents($key_file2));
-			/* Update the DB of the (local) Server */
-			$app->db->query("UPDATE web_domain SET ssl_request = '$ssl_request', ssl_cert = '$ssl_cert', ssl_key = '$ssl_key2' WHERE domain = '".$data['new']['domain']."'");
-			$app->db->query("UPDATE web_domain SET ssl_action = '' WHERE domain = '".$data['new']['domain']."'");
-			/* Update also the master-DB of the Server-Farm */
-			$app->dbmaster->query("UPDATE web_domain SET ssl_request = '$ssl_request', ssl_cert = '$ssl_cert', ssl_key = '$ssl_key2' WHERE domain = '".$data['new']['domain']."'");
-			$app->dbmaster->query("UPDATE web_domain SET ssl_action = '' WHERE domain = '".$data['new']['domain']."'");
 		}
 
 		//* Save a SSL certificate to disk
 		if ($data["new"]["ssl_action"] == 'save') {
 			$this->ssl_certificate_changed = true;
+
 			$ssl_dir = $data["new"]["document_root"]."/ssl";
-			$domain = ($data["new"]["ssl_domain"] != '')?$data["new"]["ssl_domain"]:$data["new"]["domain"];
-			$key_file = $ssl_dir.'/'.$domain.'.key.org';
-			$key_file2 = $ssl_dir.'/'.$domain.'.key';
-			$csr_file = $ssl_dir.'/'.$domain.".csr";
-			$crt_file = $ssl_dir.'/'.$domain.".crt";
-			//$bundle_file = $ssl_dir.'/'.$domain.".bundle";
+			$domain = ($data["new"]["ssl_domain"] != '') ? $data["new"]["ssl_domain"] : $data["new"]["domain"];
+			$crt_file = $ssl_dir.'/'.$domain.".nginx.crt";
 
 			//* Backup files
-			if (file_exists($key_file)) {
-				$app->system->copy($key_file,$key_file.'~');
-				$app->system->chmod($key_file.'~',0400);
-			}
-
-			if (file_exists($key_file2)) {
-				$app->system->copy($key_file2,$key_file2.'~');
-				$app->system->chmod($key_file2.'~',0400);
-			}
-
-			if (file_exists($csr_file)) {
-				$app->system->copy($csr_file,$csr_file.'~');
-			}
-
 			if (file_exists($crt_file)) {
-				$app->system->copy($crt_file,$crt_file.'~');
+				$app->system->copy($crt_file, $crt_file.'~');
+				$app->log("Copying old SSL cert ".$crt_file, LOGLEVEL_DEBUG);
 			}
-			//if (file_exists($bundle_file)) $app->system->copy($bundle_file,$bundle_file.'~');
 
 			//* Write new ssl files
-			if (trim($data["new"]["ssl_request"]) != '') {
-				$app->system->file_put_contents($csr_file,$data["new"]["ssl_request"]);
-			}
-
 			if (trim($data["new"]["ssl_cert"]) != '') {
-				$app->system->file_put_contents($crt_file,$data["new"]["ssl_cert"]);
+				$app->system->file_put_contents($crt_file, $data["new"]["ssl_cert"]);
 			}
-
-			//if (trim($data["new"]["ssl_bundle"]) != '') $app->system->file_put_contents($bundle_file,$data["new"]["ssl_bundle"]);
-			if (trim($data["new"]["ssl_key"]) != '') {
-				$app->system->file_put_contents($key_file2,$data["new"]["ssl_key"]);
-			}
-
-			$app->system->chmod($key_file2,0400);
 
 			// for nginx, bundle files have to be appended to the certificate file
 			if (trim($data["new"]["ssl_bundle"]) != '') {
@@ -295,44 +148,21 @@ class nginx_reverse_proxy_plugin {
 				}
 
 				$crt_file_contents .= $data["new"]["ssl_bundle"];
-				$app->system->file_put_contents($crt_file,$app->file->unix_nl($crt_file_contents));
+				$app->system->file_put_contents($crt_file, $app->file->unix_nl($crt_file_contents));
 				unset($crt_file_contents);
 			}
-
-			/* Update the DB of the (local) Server */
-			$app->db->query("UPDATE web_domain SET ssl_action = '' WHERE domain = '".$data['new']['domain']."'");
-
-			/* Update also the master-DB of the Server-Farm */
-			$app->dbmaster->query("UPDATE web_domain SET ssl_action = '' WHERE domain = '".$data['new']['domain']."'");
-			$app->log('Saving SSL Cert for: '.$domain,LOGLEVEL_DEBUG);
 		}
 
 		//* Delete a SSL certificate
 		if ($data['new']['ssl_action'] == 'del') {
 			$ssl_dir = $data['new']['document_root'].'/ssl';
-			$domain = ($data["new"]["ssl_domain"] != '')?$data["new"]["ssl_domain"]:$data["new"]["domain"];
-			$csr_file = $ssl_dir.'/'.$domain.'.csr';
-			$crt_file = $ssl_dir.'/'.$domain.'.crt';
-			//$bundle_file = $ssl_dir.'/'.$domain.'.bundle';
+			$domain = ($data["new"]["ssl_domain"] != '') ? $data["new"]["ssl_domain"] : $data["new"]["domain"];
+			$crt_file = $ssl_dir.'/'.$domain.'.nginx.crt';
 
-			if (file_exists($web_config['CA_path'].'/openssl.cnf') && !is_link($web_config['CA_path'].'/openssl.cnf')) {
-				exec("openssl ca -batch -config ".$web_config['CA_path']."/openssl.cnf -passin pass:".$web_config['CA_pass']." -revoke $crt_file");
-				$app->log("Revoking CA-signed SSL Cert for: $domain",LOGLEVEL_DEBUG);
-			};
-
-			$app->system->unlink($csr_file);
 			$app->system->unlink($crt_file);
-			//$app->system->unlink($bundle_file);
-			/* Update the DB of the (local) Server */
-			$app->db->query("UPDATE web_domain SET ssl_request = '', ssl_cert = '' WHERE domain = '".$data['new']['domain']."'");
-			$app->db->query("UPDATE web_domain SET ssl_action = '' WHERE domain = '".$data['new']['domain']."'");
-			/* Update also the master-DB of the Server-Farm */
-			$app->dbmaster->query("UPDATE web_domain SET ssl_request = '', ssl_cert = '' WHERE domain = '".$data['new']['domain']."'");
-			$app->dbmaster->query("UPDATE web_domain SET ssl_action = '' WHERE domain = '".$data['new']['domain']."'");
-			$app->log('Deleting SSL Cert for: '.$domain,LOGLEVEL_DEBUG);
+			$app->log("Deleting SSL cert ".$crt_file, LOGLEVEL_DEBUG);
 		}
 	}
-
 
 	function insert($event_name,$data) {
 		global $app, $conf;
