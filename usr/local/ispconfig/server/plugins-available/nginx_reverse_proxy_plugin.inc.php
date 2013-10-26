@@ -164,12 +164,14 @@ class nginx_reverse_proxy_plugin {
 		}
 	}
 
-	function insert($event_name,$data) {
+	/**
+	 *
+	 */
+	function insert($event_name, $data) {
 		global $app, $conf;
 
 		$this->action = 'insert';
-		// just run the update function
-		$this->update($event_name,$data);
+		$this->update($event_name, $data);
 	}
 
 
