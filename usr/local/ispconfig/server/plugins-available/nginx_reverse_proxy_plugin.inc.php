@@ -39,15 +39,9 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 class nginx_reverse_proxy_plugin {
 
-	/**
-	 * ISPConfig internals
-	 */
 	var $plugin_name = 'nginx_reverse_proxy_plugin';
 	var $class_name = 'nginx_reverse_proxy_plugin';
 
-	/**
-	 * Private variables (temporary stores)
-	 */
 	var $action = '';
 
 
@@ -80,10 +74,6 @@ class nginx_reverse_proxy_plugin {
 		$app->plugins->registerEvent('web_domain_update',$this->plugin_name,'update');
 		$app->plugins->registerEvent('web_domain_delete',$this->plugin_name,'delete');
 
-		$app->plugins->registerEvent('server_ip_insert',$this->plugin_name,'server_ip');
-		$app->plugins->registerEvent('server_ip_update',$this->plugin_name,'server_ip');
-		$app->plugins->registerEvent('server_ip_delete',$this->plugin_name,'server_ip');
-
 		$app->plugins->registerEvent('client_delete',$this->plugin_name,'client_delete');
 
 		$app->plugins->registerEvent('web_folder_user_insert',$this->plugin_name,'web_folder_user');
@@ -101,7 +91,6 @@ class nginx_reverse_proxy_plugin {
 	 *
 	 * @param string $event_name the event/action name
 	 * @param array $data the vhost data
-	 * @return void
 	 */
 	function ssl($event_name, $data) {
 		global $app, $conf;
@@ -200,7 +189,6 @@ class nginx_reverse_proxy_plugin {
 	 *
 	 * @param string $event_name the event/action name
 	 * @param array $data the vhost data
-	 * @return void
 	 */
 	function update($event_name, $data) {
 		global $app, $conf;
@@ -981,7 +969,6 @@ class nginx_reverse_proxy_plugin {
 	 *
 	 * @param string $event_name the event/action name
 	 * @param array $data the vhost data
-	 * @return void
 	 */
 	function delete($event_name, $data) {
 		global $app, $conf;
@@ -1031,20 +1018,12 @@ class nginx_reverse_proxy_plugin {
 	}
 
 	/**
-	 * ISPConfig server IP hook.
+	 * ISPConfig protected folder hook.
 	 *
-	 * This function is called when a IP on the server is inserted, updated or deleted.
+	 * This method is called when a folder user is created/removed/updated.
 	 *
 	 * @param string $event_name the event/action name
 	 * @param array $data the vhost data
-	 * @return void
-	 */
-	function server_ip($event_name, $data) {
-		return;
-	}
-
-	/**
-	 *
 	 */
 	function web_folder_user($event_name, $data) {
 		global $app, $conf;
@@ -1061,7 +1040,7 @@ class nginx_reverse_proxy_plugin {
 		$website = $app->db->queryOneRecord("SELECT * FROM web_domain WHERE domain_id = ".intval($folder['parent_domain_id']));
 
 		if (!is_array($folder) or !is_array($website)) {
-			$app->log('Not able to retrieve folder or website record.',LOGLEVEL_DEBUG);
+			$app->log('Not able to retrieve folder or website record.', LOGLEVEL_DEBUG);
 			return false;
 		}
 
@@ -1071,17 +1050,16 @@ class nginx_reverse_proxy_plugin {
 		}
 
 		//* Get the folder path.
-		if (substr($folder['path'],0,1) == '/') {
-			$folder['path'] = substr($folder['path'],1);
+		if (substr($folder['path'], 0, 1) == '/') {
+			$folder['path'] = substr($folder['path'], 1);
 		}
 
-		if (substr($folder['path'],-1) == '/') {
-			$folder['path'] = substr($folder['path'],0,-1);
+		if (substr($folder['path'], -1) == '/') {
+			$folder['path'] = substr($folder['path'], 0, -1);
 		}
 
 		$folder_path = escapeshellcmd($website['document_root'].'/' . $web_folder . '/'.$folder['path']);
-
-		if (substr($folder_path,-1) != '/') {
+		if (substr($folder_path, -1) != '/') {
 			$folder_path .= '/';
 		}
 
@@ -1091,45 +1069,18 @@ class nginx_reverse_proxy_plugin {
 			return false;
 		}
 
-		//* Create the folder path, if it does not exist
-		if (!is_dir($folder_path)) {
-			$app->system->mkdirpath($folder_path);
-			$app->system->chown($folder_path,$website['system_user']);
-			$app->system->chgrp($folder_path,$website['system_group']);
-		}
-
-		//* Create empty .htpasswd file, if it does not exist
-		if (!is_file($folder_path.'.htpasswd')) {
-			touch($folder_path.'.htpasswd');
-			$app->system->chmod($folder_path.'.htpasswd',0755);
-			$app->system->chown($folder_path.'.htpasswd',$website['system_user']);
-			$app->system->chgrp($folder_path.'.htpasswd',$website['system_group']);
-			$app->log('Created file '.$folder_path.'.htpasswd',LOGLEVEL_DEBUG);
-		}
-
-		if (($data['new']['username'] != $data['old']['username'] || $data['new']['active'] == 'n') && $data['old']['username'] != '') {
-			$app->system->removeLine($folder_path.'.htpasswd',$data['old']['username'].':');
-			$app->log('Removed user: '.$data['old']['username'],LOGLEVEL_DEBUG);
-		}
-
-		//* Add or remove the user from .htpasswd file
-		if ($event_name == 'web_folder_user_delete') {
-			$app->system->removeLine($folder_path.'.htpasswd',$data['old']['username'].':');
-			$app->log('Removed user: '.$data['old']['username'],LOGLEVEL_DEBUG);
-		} else {
-			if ($data['new']['active'] == 'y') {
-				$app->system->replaceLine($folder_path.'.htpasswd',$data['new']['username'].':',$data['new']['username'].':'.$data['new']['password'],0,1);
-				$app->log('Added or updated user: '.$data['new']['username'],LOGLEVEL_DEBUG);
-			}
-		}
-
 		// write basic auth configuration to vhost file because nginx does not support .htaccess
 		$webdata['new'] = $webdata['old'] = $website;
 		$this->update('web_domain_update', $webdata);
 	}
 
 	/**
+	 * ISPConfig protected folder delete hook.
 	 *
+	 * This method is called when a protected folder is deleted.
+	 *
+	 * @param string $event_name the event/action name
+	 * @param array $data the vhost data
 	 */
 	function web_folder_delete($event_name, $data) {
 		global $app, $conf;
@@ -1159,7 +1110,6 @@ class nginx_reverse_proxy_plugin {
 		}
 
 		$folder_path = realpath($website['document_root'].'/' . $web_folder . '/'.$folder['path']);
-
 		if (substr($folder_path,-1) != '/') {
 			$folder_path .= '/';
 		}
@@ -1170,21 +1120,20 @@ class nginx_reverse_proxy_plugin {
 			return false;
 		}
 
-		//* Remove .htpasswd file
-		if (is_file($folder_path.'.htpasswd')) {
-			$app->system->unlink($folder_path.'.htpasswd');
-			$app->log('Removed file '.$folder_path.'.htpasswd',LOGLEVEL_DEBUG);
-		}
-
 		// write basic auth configuration to vhost file because nginx does not support .htaccess
 		$webdata['new'] = $webdata['old'] = $website;
 		$this->update('web_domain_update', $webdata);
 	}
 
 	/**
+	 * ISPConfig protected folder update hook.
 	 *
+	 * This method is called when a protected folder is update.
+	 *
+	 * @param string $event_name the event/action name
+	 * @param array $data the vhost data
 	 */
-	function web_folder_update($event_name,$data) {
+	function web_folder_update($event_name, $data) {
 		global $app, $conf;
 
 		$website = $app->db->queryOneRecord("SELECT * FROM web_domain WHERE domain_id = ".intval($data['new']['parent_domain_id']));
@@ -1209,7 +1158,6 @@ class nginx_reverse_proxy_plugin {
 		}
 
 		$old_folder_path = realpath($website['document_root'].'/' . $web_folder . '/'.$data['old']['path']);
-
 		if (substr($old_folder_path,-1) != '/') {
 			$old_folder_path .= '/';
 		}
@@ -1223,7 +1171,6 @@ class nginx_reverse_proxy_plugin {
 		}
 
 		$new_folder_path = escapeshellcmd($website['document_root'].'/' . $web_folder . '/'.$data['new']['path']);
-
 		if (substr($new_folder_path,-1) != '/') {
 			$new_folder_path .= '/';
 		}
@@ -1248,19 +1195,6 @@ class nginx_reverse_proxy_plugin {
 		if (substr($new_folder_path,0,strlen($website['document_root'])) != $website['document_root']) {
 			$app->log('New folder path '.$new_folder_path.' is outside of docroot.',LOGLEVEL_DEBUG);
 			return false;
-		}
-
-		//* Create the folder path, if it does not exist
-		if (!is_dir($new_folder_path)) {
-			$app->system->mkdirpath($new_folder_path);
-		}
-
-		if ($data['old']['path'] != $data['new']['path']) {
-			//* move .htpasswd file
-			if (is_file($old_folder_path.'.htpasswd')) {
-				$app->system->rename($old_folder_path.'.htpasswd',$new_folder_path.'.htpasswd');
-				$app->log('Moved file '.$old_folder_path.'.htpasswd to '.$new_folder_path.'.htpasswd',LOGLEVEL_DEBUG);
-			}
 		}
 
 		// write basic auth configuration to vhost file because nginx does not support .htaccess
