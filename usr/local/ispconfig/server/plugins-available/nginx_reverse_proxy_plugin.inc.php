@@ -2969,40 +2969,10 @@ class nginx_reverse_proxy_plugin {
 		return trim($vhost_conf);
 	}
 
-	function client_delete($event_name,$data) {
-		global $app, $conf;
-
-		$app->uses("getconf");
-		$web_config = $app->getconf->get_server_config($conf["server_id"], 'web');
-
-		$client_id = intval($data['old']['client_id']);
-
-		if ($client_id > 0) {
-			$client_dir = $web_config['website_basedir'].'/clients/client'.$client_id;
-
-			if (is_dir($client_dir) && !stristr($client_dir,'..')) {
-				// remove symlinks from $client_dir
-				$files = array_diff(scandir($client_dir), array('.','..'));
-
-				if (is_array($files) && !empty($files)) {
-					foreach($files as $file) {
-						if (is_link($client_dir.'/'.$file)) {
-							unlink($client_dir.'/'.$file);
-							$app->log('Removed symlink: '.$client_dir.'/'.$file,LOGLEVEL_DEBUG);
-						}
-					}
-				}
-
-				@rmdir($client_dir);
-				$app->log('Removed client directory: '.$client_dir,LOGLEVEL_DEBUG);
-			}
-
-			if ($app->system->is_group('client'.$client_id)) {
-				$this->_exec('groupdel client'.$client_id);
-				$app->log('Removed group client'.$client_id,LOGLEVEL_DEBUG);
-			}
-		}
-	}
+	/**
+	 *
+	 */
+	function client_delete($event_name, $data) {}
 
 	//* Wrapper for exec function for easier debugging
 	private function _exec($command) {
