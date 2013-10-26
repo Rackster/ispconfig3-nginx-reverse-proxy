@@ -199,14 +199,20 @@ class nginx_reverse_proxy_plugin {
 	}
 
 	/**
+	 * ISPConfig update hook.
 	 *
+	 * Called every time a site gets updated from within ISPConfig.
+	 *
+	 * @param string $event_name the event/action name
+	 * @param array $data the vhost data
+	 * @return void
 	 */
-	function update($event_name,$data) {
+	function update($event_name, $data) {
 		global $app, $conf;
 
-		//* Check if the apache plugin is enabled
-		if (@is_link('/usr/local/ispconfig/server/plugins-enabled/apache2_plugin.inc.php')) {
-			$app->log('The nginx plugin cannot be used together with the apache2 plugin.',LOGLEVEL_WARN);
+		//* Check if the Nginx plugin is enabled
+		if (@is_link('/usr/local/ispconfig/server/plugins-enabled/nginx_plugin.inc.php')) {
+			$app->log('The Nginx Reverse Proxy cannot be used together with the Nginx plugin.', LOGLEVEL_WARN);
 			return 0;
 		}
 
@@ -223,14 +229,16 @@ class nginx_reverse_proxy_plugin {
 				$tmp = $app->db->queryOneRecord('SELECT * FROM web_domain WHERE domain_id = '.$old_parent_domain_id." AND active = 'y'");
 				$data['new'] = $tmp;
 				$data['old'] = $tmp;
+
 				$this->action = 'update';
-				$this->update($event_name,$data);
+				$this->update($event_name, $data);
 			}
 
 			// This is not a vhost, so we need to update the parent record instead.
 			$tmp = $app->db->queryOneRecord('SELECT * FROM web_domain WHERE domain_id = '.$new_parent_domain_id." AND active = 'y'");
 			$data['new'] = $tmp;
 			$data['old'] = $tmp;
+
 			$this->action = 'update';
 		}
 
@@ -241,564 +249,46 @@ class nginx_reverse_proxy_plugin {
 		//* Check if this is a chrooted setup
 		if ($web_config['website_basedir'] != '' && @is_file($web_config['website_basedir'].'/etc/passwd')) {
 			$nginx_chrooted = true;
-			$app->log('Info: nginx is chrooted.',LOGLEVEL_DEBUG);
+			$app->log('Info: nginx is chrooted.', LOGLEVEL_DEBUG);
 		} else {
 			$nginx_chrooted = false;
 		}
 
 		if ($data['new']['document_root'] == '') {
 			if ($data['new']['type'] == 'vhost' || $data['new']['type'] == 'vhostsubdomain') {
-				$app->log('document_root not set',LOGLEVEL_WARN);
+				$app->log('document_root not set', LOGLEVEL_WARN);
 			}
 
 			return 0;
 		}
 
 		if ($data['new']['system_user'] == 'root' or $data['new']['system_group'] == 'root') {
-			$app->log('Websites cannot be owned by the root user or group.',LOGLEVEL_WARN);
+			$app->log('Websites cannot be owned by the root user or group.', LOGLEVEL_WARN);
 			return 0;
 		}
 
 		if (trim($data['new']['domain']) == '') {
-			$app->log('domain is empty',LOGLEVEL_WARN);
+			$app->log('domain is empty', LOGLEVEL_WARN);
 			return 0;
 		}
 
 		$web_folder = 'web';
-		$log_folder = 'log';
-
 		if ($data['new']['type'] == 'vhostsubdomain') {
-			$tmp = $app->db->queryOneRecord('SELECT `domain` FROM web_domain WHERE domain_id = '.intval($data['new']['parent_domain_id']));
-			$subdomain_host = preg_replace('/^(.*)\.' . preg_quote($tmp['domain'], '/') . '$/', '$1', $data['new']['domain']);
-
-			if ($subdomain_host == '') {
-				$subdomain_host = 'web'.$data['new']['domain_id'];
-			}
-
 			$web_folder = $data['new']['web_folder'];
-			$log_folder .= '/' . $subdomain_host;
-			unset($tmp);
 		}
 
-		// Create group and user, if not exist
 		$app->uses('system');
 
-		if ($web_config['connect_userid_to_webid'] == 'y') {
-			//* Calculate the uid and gid
-			$connect_userid_to_webid_start = ($web_config['connect_userid_to_webid_start'] < 1000)?1000:intval($web_config['connect_userid_to_webid_start']);
-			$fixed_uid_gid = intval($connect_userid_to_webid_start + $data['new']['domain_id']);
-			$fixed_uid_param = '--uid '.$fixed_uid_gid;
-			$fixed_gid_param = '--gid '.$fixed_uid_gid;
-
-			//* Check if a ispconfigend user and group exists and create them
-			if (!$app->system->is_group('ispconfigend')) {
-				exec('groupadd --gid '.($connect_userid_to_webid_start + 10000).' ispconfigend');
-			}
-
-			if (!$app->system->is_user('ispconfigend')) {
-				exec('useradd -g ispconfigend -d /usr/local/ispconfig --uid '.($connect_userid_to_webid_start + 10000).' ispconfigend');
-			}
-
-		} else {
-			$fixed_uid_param = '';
-			$fixed_gid_param = '';
-		}
-
 		$groupname = escapeshellcmd($data['new']['system_group']);
-
-		if ($data['new']['system_group'] != '' && !$app->system->is_group($data['new']['system_group'])) {
-			exec('groupadd '.$fixed_gid_param.' '.$groupname);
-
-			if ($nginx_chrooted) {
-				$this->_exec('chroot '.escapeshellcmd($web_config['website_basedir']).' groupadd '.$groupname);
-			}
-
-			$app->log('Adding the group: '.$groupname,LOGLEVEL_DEBUG);
-		}
-
 		$username = escapeshellcmd($data['new']['system_user']);
-
-		if ($data['new']['system_user'] != '' && !$app->system->is_user($data['new']['system_user'])) {
-			if ($web_config['add_web_users_to_sshusers_group'] == 'y') {
-				exec('useradd -d '.escapeshellcmd($data['new']['document_root'])." -g $groupname $fixed_uid_param -G sshusers $username -s /bin/false");
-
-				if ($nginx_chrooted) {
-					$this->_exec('chroot '.escapeshellcmd($web_config['website_basedir']).' useradd -d '.escapeshellcmd($data['new']['document_root'])." -g $groupname $fixed_uid_param -G sshusers $username -s /bin/false");
-				}
-			} else {
-				exec('useradd -d '.escapeshellcmd($data['new']['document_root'])." -g $groupname $fixed_uid_param $username -s /bin/false");
-
-				if ($nginx_chrooted) {
-					$this->_exec('chroot '.escapeshellcmd($web_config['website_basedir']).' useradd -d '.escapeshellcmd($data['new']['document_root'])." -g $groupname $fixed_uid_param $username -s /bin/false");
-				}
-			}
-
-			$app->log('Adding the user: '.$username,LOGLEVEL_DEBUG);
-		}
-
-		//* If the client of the site has been changed, we have a change of the document root
-		if ($this->action == 'update' && $data['new']['document_root'] != $data['old']['document_root']) {
-			//* Get the old client ID
-			$old_client = $app->dbmaster->queryOneRecord('SELECT client_id FROM sys_group WHERE sys_group.groupid = '.intval($data['old']['sys_groupid']));
-			$old_client_id = intval($old_client['client_id']);
-			unset($old_client);
-
-			//* Remove the old symlinks
-			$tmp_symlinks_array = explode(':',$web_config['website_symlinks']);
-			if (is_array($tmp_symlinks_array)) {
-				foreach ($tmp_symlinks_array as $tmp_symlink) {
-					$tmp_symlink = str_replace('[client_id]',$old_client_id,$tmp_symlink);
-					$tmp_symlink = str_replace('[website_domain]',$data['old']['domain'],$tmp_symlink);
-					// Remove trailing slash
-					if (substr($tmp_symlink, -1, 1) == '/') {
-						$tmp_symlink = substr($tmp_symlink, 0, -1);
-					}
-
-					// create the symlinks, if not exist
-					if (is_link($tmp_symlink)) {
-						exec('rm -f '.escapeshellcmd($tmp_symlink));
-						$app->log('Removed symlink: rm -f '.$tmp_symlink,LOGLEVEL_DEBUG);
-					}
-				}
-			}
-
-			if ($data["new"]["type"] != "vhostsubdomain") {
-				//* Move the site data
-				$tmp_docroot = explode('/',$data['new']['document_root']);
-				unset($tmp_docroot[count($tmp_docroot)-1]);
-				$new_dir = implode('/',$tmp_docroot);
-
-				$tmp_docroot = explode('/',$data['old']['document_root']);
-				unset($tmp_docroot[count($tmp_docroot)-1]);
-				$old_dir = implode('/',$tmp_docroot);
-
-				//* Check if there is already some data in the new docroot and rename it as we need a clean path to move the existing site to the new path
-				if (@is_dir($data['new']['document_root'])) {
-					$app->system->web_folder_protection($data['new']['document_root'],false);
-					$app->system->rename($data['new']['document_root'],$data['new']['document_root'].'_bak_'.date('Y_m_d_H_i_s'));
-					$app->log('Renaming existing directory in new docroot location. mv '.$data['new']['document_root'].' '.$data['new']['document_root'].'_bak_'.date('Y_m_d_H_i_s'),LOGLEVEL_DEBUG);
-				}
-
-				//* Create new base directory, if it does not exist yet
-				if (!is_dir($new_dir)) {
-					$app->system->mkdirpath($new_dir);
-				}
-
-				$app->system->web_folder_protection($data['old']['document_root'],false);
-				exec('mv '.escapeshellarg($data['old']['document_root']).' '.escapeshellarg($new_dir));
-				//$app->system->rename($data['old']['document_root'],$new_dir);
-				$app->log('Moving site to new document root: mv '.$data['old']['document_root'].' '.$new_dir,LOGLEVEL_DEBUG);
-
-				// Handle the change in php_open_basedir
-				$data['new']['php_open_basedir'] = str_replace($data['old']['document_root'],$data['new']['document_root'],$data['old']['php_open_basedir']);
-
-				//* Change the owner of the website files to the new website owner
-				exec('chown --recursive --from='.escapeshellcmd($data['old']['system_user']).':'.escapeshellcmd($data['old']['system_group']).' '.escapeshellcmd($data['new']['system_user']).':'.escapeshellcmd($data['new']['system_group']).' '.$new_dir);
-
-				//* Change the home directory and group of the website user
-				$command = 'killall -u '.escapeshellcmd($data['new']['system_user']).' ; usermod';
-				$command .= ' --home '.escapeshellcmd($data['new']['document_root']);
-				$command .= ' --gid '.escapeshellcmd($data['new']['system_group']);
-				$command .= ' '.escapeshellcmd($data['new']['system_user']).' 2>/dev/null';
-				exec($command);
-			}
-
-			if ($nginx_chrooted) {
-				$this->_exec('chroot '.escapeshellcmd($web_config['website_basedir']).' '.$command);
-			}
-
-			//* Change the log mount
-			$fstab_line = '/var/log/ispconfig/httpd/'.$data['old']['domain'].' '.$data['old']['document_root'].'/'.$log_folder.'    none    bind';
-			$app->system->removeLine('/etc/fstab',$fstab_line);
-			$fstab_line = '/var/log/ispconfig/httpd/'.$data['new']['domain'].' '.$data['new']['document_root'].'/'.$log_folder.'    none    bind,nobootwait    0 0';
-			$app->system->replaceLine('/etc/fstab',$fstab_line,$fstab_line,1,1);
-		}
-
-		//print_r($data);
-
-		// Check if the directories are there and create them if necessary.
-		$app->system->web_folder_protection($data['new']['document_root'],false);
-
-		if (!is_dir($data['new']['document_root'].'/' . $web_folder)) {
-			$app->system->mkdirpath($data['new']['document_root'].'/' . $web_folder);
-		}
-
-		if (!is_dir($data['new']['document_root'].'/' . $web_folder . '/error') and $data['new']['errordocs']) $app->system->mkdirpath($data['new']['document_root'].'/' . $web_folder . '/error');
-		//if (!is_dir($data['new']['document_root'].'/'.$log_folder)) exec('mkdir -p '.$data['new']['document_root'].'/'.$log_folder);
-		if (!is_dir($data['new']['document_root'].'/ssl')) {
-			$app->system->mkdirpath($data['new']['document_root'].'/ssl');
-		}
-
-		if (!is_dir($data['new']['document_root'].'/cgi-bin')) {
-			$app->system->mkdirpath($data['new']['document_root'].'/cgi-bin');
-		}
-
-		if (!is_dir($data['new']['document_root'].'/tmp')) {
-			$app->system->mkdirpath($data['new']['document_root'].'/tmp');
-		}
-
-		//if (!is_dir($data['new']['document_root'].'/webdav')) $app->system->mkdirpath($data['new']['document_root'].'/webdav');
-
-		//* Create the new private directory
-		if (!is_dir($data['new']['document_root'].'/private')) {
-			$app->system->mkdirpath($data['new']['document_root'].'/private');
-			$app->system->chmod($data['new']['document_root'].'/private',0710);
-			$app->system->chown($data['new']['document_root'].'/private',$username);
-			$app->system->chgrp($data['new']['document_root'].'/private',$groupname);
-		}
-
-		// Remove the symlink for the site, if site is renamed
-		if ($this->action == 'update' && $data['old']['domain'] != '' && $data['new']['domain'] != $data['old']['domain']) {
-			if (is_dir('/var/log/ispconfig/httpd/'.$data['old']['domain'])) {
-				exec('rm -rf /var/log/ispconfig/httpd/'.$data['old']['domain']);
-			}
-
-			if (is_link($data['old']['document_root'].'/'.$log_folder)) {
-				$app->system->unlink($data['old']['document_root'].'/'.$log_folder);
-			}
-
-			//* remove old log mount
-			$fstab_line = '/var/log/ispconfig/httpd/'.$data['old']['domain'].' '.$data['old']['document_root'].'/'.$log_folder.'    none    bind';
-			$app->system->removeLine('/etc/fstab',$fstab_line);
-
-			//* Unmount log directory
-			exec('umount '.escapeshellarg($data['old']['document_root'].'/'.$log_folder));
-		}
-
-		//* Create the log dir if nescessary and mount it
-		if (!is_dir($data['new']['document_root'].'/'.$log_folder) || !is_dir('/var/log/ispconfig/httpd/'.$data['new']['domain']) || is_link($data['new']['document_root'].'/'.$log_folder)) {
-			if (is_link($data['new']['document_root'].'/'.$log_folder)) {
-				unlink($data['new']['document_root'].'/'.$log_folder);
-			}
-
-			if (!is_dir('/var/log/ispconfig/httpd/'.$data['new']['domain'])) {
-				exec('mkdir -p /var/log/ispconfig/httpd/'.$data['new']['domain']);
-			}
-
-			$app->system->mkdirpath($data['new']['document_root'].'/'.$log_folder);
-			$app->system->chown($data['new']['document_root'].'/'.$log_folder,'root');
-			$app->system->chgrp($data['new']['document_root'].'/'.$log_folder,'root');
-			$app->system->chmod($data['new']['document_root'].'/'.$log_folder,0755);
-			exec('mount --bind '.escapeshellarg('/var/log/ispconfig/httpd/'.$data['new']['domain']).' '.escapeshellarg($data['new']['document_root'].'/'.$log_folder));
-			//* add mountpoint to fstab
-			$fstab_line = '/var/log/ispconfig/httpd/'.$data['new']['domain'].' '.$data['new']['document_root'].'/'.$log_folder.'    none    bind,nobootwait    0 0';
-			$app->system->replaceLine('/etc/fstab',$fstab_line,$fstab_line,1,1);
-		}
-
-		$app->system->web_folder_protection($data['new']['document_root'],true);
-
-		// Get the client ID
-		$client = $app->dbmaster->queryOneRecord('SELECT client_id FROM sys_group WHERE sys_group.groupid = '.intval($data['new']['sys_groupid']));
-		$client_id = intval($client['client_id']);
-		unset($client);
-
-		// Remove old symlinks, if site is renamed
-		if ($this->action == 'update' && $data['old']['domain'] != '' && $data['new']['domain'] != $data['old']['domain']) {
-			$tmp_symlinks_array = explode(':',$web_config['website_symlinks']);
-
-			if (is_array($tmp_symlinks_array)) {
-				foreach ($tmp_symlinks_array as $tmp_symlink) {
-					$tmp_symlink = str_replace('[client_id]',$client_id,$tmp_symlink);
-					$tmp_symlink = str_replace('[website_domain]',$data['old']['domain'],$tmp_symlink);
-					// Remove trailing slash
-					if (substr($tmp_symlink, -1, 1) == '/') {
-						$tmp_symlink = substr($tmp_symlink, 0, -1);
-					}
-
-					// remove the symlinks, if not exist
-					if (is_link($tmp_symlink)) {
-						exec('rm -f '.escapeshellcmd($tmp_symlink));
-						$app->log('Removed symlink: rm -f '.$tmp_symlink,LOGLEVEL_DEBUG);
-					}
-				}
-			}
-		}
-
-		// Create the symlinks for the sites
-		$tmp_symlinks_array = explode(':',$web_config['website_symlinks']);
-		if (is_array($tmp_symlinks_array)) {
-			foreach ($tmp_symlinks_array as $tmp_symlink) {
-				$tmp_symlink = str_replace('[client_id]',$client_id,$tmp_symlink);
-				$tmp_symlink = str_replace('[website_domain]',$data['new']['domain'],$tmp_symlink);
-
-				// Remove trailing slash
-				if (substr($tmp_symlink, -1, 1) == '/') {
-					$tmp_symlink = substr($tmp_symlink, 0, -1);
-				}
-
-				//* Remove symlink if target folder has been changed.
-				if ($data['old']['document_root'] != '' && $data['old']['document_root'] != $data['new']['document_root'] && is_link($tmp_symlink)) {
-					$app->system->unlink($tmp_symlink);
-				}
-
-				// create the symlinks, if not exist
-				if (!is_link($tmp_symlink)) {
-//					exec("ln -s ".escapeshellcmd($data["new"]["document_root"])."/ ".escapeshellcmd($tmp_symlink));
-					if ($web_config["website_symlinks_rel"] == 'y') {
-						$this->create_relative_link(escapeshellcmd($data["new"]["document_root"]), escapeshellcmd($tmp_symlink));
-					} else {
-						exec("ln -s ".escapeshellcmd($data["new"]["document_root"])."/ ".escapeshellcmd($tmp_symlink));
-					}
-
-					$app->log('Creating symlink: ln -s '.$data['new']['document_root'].'/ '.$tmp_symlink,LOGLEVEL_DEBUG);
-				}
-			}
-		}
-
-		// Install the Standard or Custom Error, Index and other related files
-		// /usr/local/ispconfig/server/conf is for the standard files
-		// /usr/local/ispconfig/server/conf-custom is for the custom files
-		// setting a local var here
-
-		// normally $conf['templates'] = "/usr/local/ispconfig/server/conf";
-		if ($this->action == 'insert' && ($data['new']['type'] == 'vhost' || $data['new']['type'] == 'vhostsubdomain')) {
-			// Copy the error pages
-			if ($data['new']['errordocs']) {
-				$error_page_path = escapeshellcmd($data['new']['document_root']).'/' . $web_folder . '/error/';
-
-				if (file_exists($conf['rootpath'] . '/conf-custom/error/'.substr(escapeshellcmd($conf['language']),0,2))) {
-					exec('cp ' . $conf['rootpath'] . '/conf-custom/error/'.substr(escapeshellcmd($conf['language']),0,2).'/* '.$error_page_path);
-				} else {
-					if (file_exists($conf['rootpath'] . '/conf-custom/error/400.html')) {
-						exec('cp '. $conf['rootpath'] . '/conf-custom/error/*.html '.$error_page_path);
-					} else {
-						exec('cp ' . $conf['rootpath'] . '/conf/error/'.substr(escapeshellcmd($conf['language']),0,2).'/* '.$error_page_path);
-					}
-				}
-
-				exec('chmod -R a+r '.$error_page_path);
-			}
-
-			if (file_exists($conf['rootpath'] . '/conf-custom/index/standard_index.html_'.substr(escapeshellcmd($conf['language']),0,2))) {
-				exec('cp ' . $conf['rootpath'] . '/conf-custom/index/standard_index.html_'.substr(escapeshellcmd($conf['language']),0,2).' '.escapeshellcmd($data['new']['document_root']).'/' . $web_folder . '/index.html');
-
-				if (is_file($conf['rootpath'] . '/conf-custom/index/favicon.ico')) {
-					exec('cp ' . $conf['rootpath'] . '/conf-custom/index/favicon.ico '.escapeshellcmd($data['new']['document_root']).'/' . $web_folder . '/');
-				}
-
-				if (is_file($conf['rootpath'] . '/conf-custom/index/robots.txt')) {
-					exec('cp ' . $conf['rootpath'] . '/conf-custom/index/robots.txt '.escapeshellcmd($data['new']['document_root']).'/' . $web_folder . '/');
-				}
-
-				if (is_file($conf['rootpath'] . '/conf-custom/index/.htaccess')) {
-					exec('cp ' . $conf['rootpath'] . '/conf-custom/index/.htaccess '.escapeshellcmd($data['new']['document_root']).'/' . $web_folder . '/');
-				}
-			} else {
-				if (file_exists($conf['rootpath'] . '/conf-custom/index/standard_index.html')) {
-					exec('cp ' . $conf['rootpath'] . '/conf-custom/index/standard_index.html '.escapeshellcmd($data['new']['document_root']).'/' . $web_folder . '/index.html');
-				} else {
-					exec('cp ' . $conf['rootpath'] . '/conf/index/standard_index.html_'.substr(escapeshellcmd($conf['language']),0,2).' '.escapeshellcmd($data['new']['document_root']).'/' . $web_folder . '/index.html');
-					if (is_file($conf['rootpath'] . '/conf/index/favicon.ico')) {
-						exec('cp ' . $conf['rootpath'] . '/conf/index/favicon.ico '.escapeshellcmd($data['new']['document_root']).'/' . $web_folder . '/');
-					}
-
-					if (is_file($conf['rootpath'] . '/conf/index/robots.txt')) {
-						exec('cp ' . $conf['rootpath'] . '/conf/index/robots.txt '.escapeshellcmd($data['new']['document_root']).'/' . $web_folder . '/');
-					}
-
-					if (is_file($conf['rootpath'] . '/conf/index/.htaccess')) {
-						exec('cp ' . $conf['rootpath'] . '/conf/index/.htaccess '.escapeshellcmd($data['new']['document_root']).'/' . $web_folder . '/');
-					}
-				}
-			}
-
-			exec('chmod -R a+r '.escapeshellcmd($data['new']['document_root']).'/' . $web_folder . '/');
-
-			//** Copy the error documents on update when the error document checkbox has been activated and was deactivated before
-		} elseif ($this->action == 'update' && ($data['new']['type'] == 'vhost' || $data['new']['type'] == 'vhostsubdomain') && $data['old']['errordocs'] == 0 && $data['new']['errordocs'] == 1) {
-			$error_page_path = escapeshellcmd($data['new']['document_root']).'/' . $web_folder . '/error/';
-
-			if (file_exists($conf['rootpath'] . '/conf-custom/error/'.substr(escapeshellcmd($conf['language']),0,2))) {
-				exec('cp ' . $conf['rootpath'] . '/conf-custom/error/'.substr(escapeshellcmd($conf['language']),0,2).'/* '.$error_page_path);
-			} else {
-				if (file_exists($conf['rootpath'] . '/conf-custom/error/400.html')) {
-					exec('cp ' . $conf['rootpath'] . '/conf-custom/error/*.html '.$error_page_path);
-				} else {
-					exec('cp ' . $conf['rootpath'] . '/conf/error/'.substr(escapeshellcmd($conf['language']),0,2).'/* '.$error_page_path);
-				}
-			}
-
-			exec('chmod -R a+r '.$error_page_path);
-			exec('chown -R '.$data['new']['system_user'].':'.$data['new']['system_group'].' '.$error_page_path);
-		}  // end copy error docs
-
-		// Set the quota for the user, but only for vhosts, not vhostsubdomains
-		if ($username != '' && $app->system->is_user($username) && $data['new']['type'] == 'vhost') {
-			if ($data['new']['hd_quota'] > 0) {
-				$blocks_soft = $data['new']['hd_quota'] * 1024;
-				$blocks_hard = $blocks_soft + 1024;
-			} else {
-				$blocks_soft = $blocks_hard = 0;
-			}
-
-			exec("setquota -u $username $blocks_soft $blocks_hard 0 0 -a &> /dev/null");
-			exec('setquota -T -u '.$username.' 604800 604800 -a &> /dev/null');
-		}
-
-		if ($this->action == 'insert' || $data["new"]["system_user"] != $data["old"]["system_user"]) {
-			// Chown and chmod the directories below the document root
-			$this->_exec('chown -R '.$username.':'.$groupname.' '.escapeshellcmd($data['new']['document_root']).'/' . $web_folder);
-
-			// The document root itself has to be owned by root in normal level and by the web owner in security level 20
-			if ($web_config['security_level'] == 20) {
-				$this->_exec('chown '.$username.':'.$groupname.' '.escapeshellcmd($data['new']['document_root']).'/' . $web_folder);
-			} else {
-				$this->_exec('chown root:root '.escapeshellcmd($data['new']['document_root']).'/' . $web_folder);
-			}
-		}
-
-		//* add the nginx user to the client group if this is a vhost and security level is set to high, no matter if this is an insert or update and regardless of set_folder_permissions_on_update
-		if ($data['new']['type'] == 'vhost' && $web_config['security_level'] == 20) $app->system->add_user_to_group($groupname, escapeshellcmd($web_config['nginx_user']));
-
-		//* If the security level is set to high
-		if (($this->action == 'insert' && $data['new']['type'] == 'vhost') or ($web_config['set_folder_permissions_on_update'] == 'y' && $data['new']['type'] == 'vhost')) {
-			$app->system->web_folder_protection($data['new']['document_root'],false);
-
-			//* Check if we have the new private folder and create it if nescessary
-			if (!is_dir($data['new']['document_root'].'/private')) {
-				$app->system->mkdir($data['new']['document_root'].'/private');
-			}
-
-			if ($web_config['security_level'] == 20) {
-				$app->system->chmod($data['new']['document_root'],0755);
-				$app->system->chmod($data['new']['document_root'].'/web',0710);
-				//$app->system->chmod($data['new']['document_root'].'/webdav',0710);
-				$app->system->chmod($data['new']['document_root'].'/private',0710);
-				$app->system->chmod($data['new']['document_root'].'/ssl',0755);
-
-				// make tmp directory writable for nginx and the website users
-				$app->system->chmod($data['new']['document_root'].'/tmp',0777);
-
-				// Set Log directory to 755 to make the logs accessible by the FTP user
-				if (realpath($data['new']['document_root'].'/'.$log_folder . '/error.log') == '/var/log/ispconfig/httpd/'.$data['new']['domain'].'/error.log') {
-					$app->system->chmod($data['new']['document_root'].'/'.$log_folder,0755);
-				}
-
-				if ($web_config['add_web_users_to_sshusers_group'] == 'y') {
-					$command = 'usermod';
-					$command .= ' --groups sshusers';
-					$command .= ' '.escapeshellcmd($data['new']['system_user']).' 2>/dev/null';
-					$this->_exec($command);
-				}
-
-				//* if we have a chrooted nginx environment
-				if ($nginx_chrooted) {
-					$this->_exec('chroot '.escapeshellcmd($web_config['website_basedir']).' '.$command);
-
-					//* add the nginx user to the client group in the chroot environment
-					$tmp_groupfile = $app->system->server_conf['group_datei'];
-					$app->system->server_conf['group_datei'] = $web_config['website_basedir'].'/etc/group';
-					$app->system->add_user_to_group($groupname, escapeshellcmd($web_config['nginx_user']));
-					$app->system->server_conf['group_datei'] = $tmp_groupfile;
-					unset($tmp_groupfile);
-				}
-
-				//* Chown all default directories
-				$app->system->chown($data['new']['document_root'],'root');
-				$app->system->chgrp($data['new']['document_root'],'root');
-				$app->system->chown($data['new']['document_root'].'/cgi-bin',$username);
-				$app->system->chgrp($data['new']['document_root'].'/cgi-bin',$groupname);
-
-				if (realpath($data['new']['document_root'].'/'.$log_folder . '/error.log') == '/var/log/ispconfig/httpd/'.$data['new']['domain'].'/error.log') {
-					$app->system->chown($data['new']['document_root'].'/'.$log_folder,'root',false);
-					$app->system->chgrp($data['new']['document_root'].'/'.$log_folder,$groupname,false);
-				}
-
-				$app->system->chown($data['new']['document_root'].'/ssl','root');
-				$app->system->chgrp($data['new']['document_root'].'/ssl','root');
-				$app->system->chown($data['new']['document_root'].'/tmp',$username);
-				$app->system->chgrp($data['new']['document_root'].'/tmp',$groupname);
-				$app->system->chown($data['new']['document_root'].'/web',$username);
-				$app->system->chgrp($data['new']['document_root'].'/web',$groupname);
-				$app->system->chown($data['new']['document_root'].'/web/error',$username);
-				$app->system->chgrp($data['new']['document_root'].'/web/error',$groupname);
-				$app->system->chown($data['new']['document_root'].'/web/stats',$username);
-				$app->system->chgrp($data['new']['document_root'].'/web/stats',$groupname);
-				//$app->system->chown($data['new']['document_root'].'/webdav',$username);
-				//$app->system->chgrp($data['new']['document_root'].'/webdav',$groupname);
-				$app->system->chown($data['new']['document_root'].'/private',$username);
-				$app->system->chgrp($data['new']['document_root'].'/private',$groupname);
-
-				// If the security Level is set to medium
-			} else {
-				$app->system->chmod($data['new']['document_root'],0755);
-				$app->system->chmod($data['new']['document_root'].'/web',0755);
-				//$app->system->chmod($data['new']['document_root'].'/webdav',0755);
-				$app->system->chmod($data['new']['document_root'].'/ssl',0755);
-				$app->system->chmod($data['new']['document_root'].'/cgi-bin',0755);
-
-				// make temp directory writable for nginx and the website users
-				$app->system->chmod($data['new']['document_root'].'/tmp',0777);
-
-				// Set Log directory to 755 to make the logs accessible by the FTP user
-				if (realpath($data['new']['document_root'].'/'.$log_folder . '/error.log') == '/var/log/ispconfig/httpd/'.$data['new']['domain'].'/error.log') {
-					$app->system->chmod($data['new']['document_root'].'/'.$log_folder,0755);
-				}
-
-				$app->system->chown($data['new']['document_root'],'root');
-				$app->system->chgrp($data['new']['document_root'],'root');
-				$app->system->chown($data['new']['document_root'].'/cgi-bin',$username);
-				$app->system->chgrp($data['new']['document_root'].'/cgi-bin',$groupname);
-
-				if (realpath($data['new']['document_root'].'/'.$log_folder . '/error.log') == '/var/log/ispconfig/httpd/'.$data['new']['domain'].'/error.log') {
-					$app->system->chown($data['new']['document_root'].'/'.$log_folder,'root',false);
-					$app->system->chgrp($data['new']['document_root'].'/'.$log_folder,$groupname,false);
-				}
-
-				$app->system->chown($data['new']['document_root'].'/ssl','root');
-				$app->system->chgrp($data['new']['document_root'].'/ssl','root');
-				$app->system->chown($data['new']['document_root'].'/tmp',$username);
-				$app->system->chgrp($data['new']['document_root'].'/tmp',$groupname);
-				$app->system->chown($data['new']['document_root'].'/web',$username);
-				$app->system->chgrp($data['new']['document_root'].'/web',$groupname);
-				$app->system->chown($data['new']['document_root'].'/web/error',$username);
-				$app->system->chgrp($data['new']['document_root'].'/web/error',$groupname);
-				$app->system->chown($data['new']['document_root'].'/web/stats',$username);
-				$app->system->chgrp($data['new']['document_root'].'/web/stats',$groupname);
-				//$app->system->chown($data['new']['document_root'].'/webdav',$username);
-				//$app->system->chgrp($data['new']['document_root'].'/webdav',$groupname);
-			}
-		} elseif (($this->action == 'insert' && $data['new']['type'] == 'vhostsubdomain') or ($web_config['set_folder_permissions_on_update'] == 'y' && $data['new']['type'] == 'vhostsubdomain')) {
-			if ($web_config['security_level'] == 20) {
-				$app->system->chmod($data['new']['document_root'].'/' . $web_folder,0710);
-				$app->system->chown($data['new']['document_root'].'/' . $web_folder,$username);
-				$app->system->chgrp($data['new']['document_root'].'/' . $web_folder,$groupname);
-				$app->system->chown($data['new']['document_root'].'/' . $web_folder . '/error',$username);
-				$app->system->chgrp($data['new']['document_root'].'/' . $web_folder . '/error',$groupname);
-				$app->system->chown($data['new']['document_root'].'/' . $web_folder . '/stats',$username);
-				$app->system->chgrp($data['new']['document_root'].'/' . $web_folder . '/stats',$groupname);
-			} else {
-				$app->system->chmod($data['new']['document_root'].'/' . $web_folder,0755);
-				$app->system->chown($data['new']['document_root'].'/' . $web_folder,$username);
-				$app->system->chgrp($data['new']['document_root'].'/' . $web_folder,$groupname);
-				$app->system->chown($data['new']['document_root'].'/' . $web_folder . '/error',$username);
-				$app->system->chgrp($data['new']['document_root'].'/' . $web_folder . '/error',$groupname);
-				$app->system->chown($data['new']['document_root'].'/' . $web_folder . '/stats',$username);
-				$app->system->chgrp($data['new']['document_root'].'/' . $web_folder . '/stats',$groupname);
-			}
-		}
-
-		//* Protect web folders
-		$app->system->web_folder_protection($data['new']['document_root'],true);
-
-		if ($data['new']['type'] == 'vhost') {
-			// Change the ownership of the error log to the root user
-			if (!@is_file('/var/log/ispconfig/httpd/'.$data['new']['domain'].'/error.log')) {
-				exec('touch '.escapeshellcmd('/var/log/ispconfig/httpd/'.$data['new']['domain'].'/error.log'));
-			}
-
-			$app->system->chown('/var/log/ispconfig/httpd/'.$data['new']['domain'].'/error.log','root');
-			$app->system->chgrp('/var/log/ispconfig/httpd/'.$data['new']['domain'].'/error.log','root');
-		}
 
 		//* Create the vhost config file
 		$app->load('tpl');
 
 		$tpl = new tpl();
-		$tpl->newTemplate('nginx_vhost.conf.master');
+		$tpl->newTemplate('nginx_reverse_proxy_plugin.vhost.conf.master');
 
 		$vhost_data = $data['new'];
-		//unset($vhost_data['ip_address']);
 		$vhost_data['web_document_root'] = $data['new']['document_root'].'/' . $web_folder;
 		$vhost_data['web_document_root_www'] = $web_config['website_basedir'].'/'.$data['new']['domain'].'/' . $web_folder;
 		$vhost_data['web_basedir'] = $web_config['website_basedir'];
@@ -809,80 +299,17 @@ class nginx_reverse_proxy_plugin {
 
 			if ($conf['serverconfig']['web']['vhost_rewrite_v6'] == 'y') {
 				if (isset($conf['serverconfig']['server']['v6_prefix']) && $conf['serverconfig']['server']['v6_prefix'] <> '') {
-					$explode_v6prefix=explode(':',$conf['serverconfig']['server']['v6_prefix']);
-					$explode_v6=explode(':',$data['new']['ipv6_address']);
+					$explode_v6prefix = explode(':', $conf['serverconfig']['server']['v6_prefix']);
+					$explode_v6 = explode(':', $data['new']['ipv6_address']);
 
-					for ( $i = 0; $i <= count($explode_v6prefix)-3; $i++) {
+					for ($i = 0; $i <= count($explode_v6prefix) - 3; $i++) {
 						$explode_v6[$i] = $explode_v6prefix[$i];
 					}
 
-					$data['new']['ipv6_address'] = implode(':',$explode_v6);
+					$data['new']['ipv6_address'] = implode(':', $explode_v6);
 					$vhost_data['ipv6_address'] = $data['new']['ipv6_address'];
 				}
 			}
-		}
-
-		// PHP-FPM
-		// Support for multiple PHP versions
-		if ($data['new']['php'] != 'no') {
-			if (trim($data['new']['fastcgi_php_version']) != '') {
-				$default_php_fpm = false;
-				list($custom_php_fpm_name, $custom_php_fpm_init_script, $custom_php_fpm_ini_dir, $custom_php_fpm_pool_dir) = explode(':', trim($data['new']['fastcgi_php_version']));
-
-				if (substr($custom_php_fpm_ini_dir,-1) != '/') {
-					$custom_php_fpm_ini_dir .= '/';
-				}
-			} else {
-				$default_php_fpm = true;
-			}
-		} else {
-			if (trim($data['old']['fastcgi_php_version']) != '' && $data['old']['php'] != 'no') {
-				$default_php_fpm = false;
-				list($custom_php_fpm_name, $custom_php_fpm_init_script, $custom_php_fpm_ini_dir, $custom_php_fpm_pool_dir) = explode(':', trim($data['old']['fastcgi_php_version']));
-
-				if (substr($custom_php_fpm_ini_dir,-1) != '/') {
-					$custom_php_fpm_ini_dir .= '/';
-				}
-			} else {
-				$default_php_fpm = true;
-			}
-		}
-
-		if ($default_php_fpm) {
-			$pool_dir = escapeshellcmd($web_config['php_fpm_pool_dir']);
-		} else {
-			$pool_dir = $custom_php_fpm_pool_dir;
-		}
-
-		if (substr($pool_dir,-1) != '/') {
-			$pool_dir .= '/';
-		}
-
-		$pool_name = 'web'.$data['new']['domain_id'];
-		$socket_dir = escapeshellcmd($web_config['php_fpm_socket_dir']);
-
-		if (substr($socket_dir,-1) != '/') {
-			$socket_dir .= '/';
-		}
-
-		if ($data['new']['php_fpm_use_socket'] == 'y') {
-			$use_tcp = 0;
-			$use_socket = 1;
-		} else {
-			$use_tcp = 1;
-			$use_socket = 0;
-		}
-
-		$tpl->setVar('use_tcp', $use_tcp);
-		$tpl->setVar('use_socket', $use_socket);
-		$fpm_socket = $socket_dir.$pool_name.'.sock';
-		$tpl->setVar('fpm_socket', $fpm_socket);
-		$tpl->setVar('rnd_php_dummy_file', '/'.md5(uniqid(microtime(),1)).'.htm');
-		$vhost_data['fpm_port'] = $web_config['php_fpm_start_port'] + $data['new']['domain_id'] - 1;
-
-		// backwards compatibility; since ISPConfig 3.0.5, the PHP mode for nginx is called 'php-fpm' instead of 'fast-cgi'. The following line makes sure that old web sites that have 'fast-cgi' in the database still get PHP-FPM support.
-		if ($vhost_data['php'] == 'fast-cgi') {
-			$vhost_data['php'] = 'php-fpm';
 		}
 
 		// Custom rewrite rules
@@ -901,7 +328,7 @@ class nginx_reverse_proxy_plugin {
 			if (is_array($custom_rewrite_rule_lines) && !empty($custom_rewrite_rule_lines)) {
 				foreach ($custom_rewrite_rule_lines as $custom_rewrite_rule_line) {
 					// ignore comments
-					if (substr(ltrim($custom_rewrite_rule_line),0,1) == '#') {
+					if (substr(ltrim($custom_rewrite_rule_line), 0, 1) == '#') {
 						$final_rewrite_rules[] = array('rewrite_rule' => $custom_rewrite_rule_line);
 						continue;
 					}
@@ -996,14 +423,14 @@ class nginx_reverse_proxy_plugin {
 		$ssl_dir = $data['new']['document_root'].'/ssl';
 		$domain = $data['new']['ssl_domain'];
 		$key_file = $ssl_dir.'/'.$domain.'.key';
-		$crt_file = $ssl_dir.'/'.$domain.'.crt';
+		$crt_file = $ssl_dir.'/'.$domain.'.nginx.crt';
 
-		if ($domain!='' && $data['new']['ssl'] == 'y' && @is_file($crt_file) && @is_file($key_file) && (@filesize($crt_file)>0)  && (@filesize($key_file)>0)) {
+		if ($domain != '' && $data['new']['ssl'] == 'y' && @is_file($crt_file) && @is_file($key_file) && (@filesize($crt_file) > 0)  && (@filesize($key_file) > 0)) {
 			$vhost_data['ssl_enabled'] = 1;
-			$app->log('Enable SSL for: '.$domain,LOGLEVEL_DEBUG);
+			$app->log('Enable SSL for: '.$domain, LOGLEVEL_DEBUG);
 		} else {
 			$vhost_data['ssl_enabled'] = 0;
-			$app->log('SSL Disabled. '.$domain,LOGLEVEL_DEBUG);
+			$app->log('SSL Disabled. '.$domain, LOGLEVEL_DEBUG);
 		}
 
 		// Set SEO Redirect
@@ -1028,51 +455,26 @@ class nginx_reverse_proxy_plugin {
 		$local_rewrite_rules = array();
 
 		if ($data['new']['redirect_type'] != '' && $data['new']['redirect_path'] != '') {
-			if (substr($data['new']['redirect_path'],-1) != '/') {
+			if (substr($data['new']['redirect_path'], -1) != '/') {
 				$data['new']['redirect_path'] .= '/';
 			}
 
-			if (substr($data['new']['redirect_path'],0,8) == '[scheme]') {
+			if (substr($data['new']['redirect_path'], 0, 8) == '[scheme]') {
 				if ($data['new']['redirect_type'] != 'proxy') {
-					$data['new']['redirect_path'] = '$scheme'.substr($data['new']['redirect_path'],8);
-				} else {
-					$data['new']['redirect_path'] = 'http'.substr($data['new']['redirect_path'],8);
+					$data['new']['redirect_path'] = '$scheme'.substr($data['new']['redirect_path'], 8);
 				}
-			}
-
-			// Custom proxy directives
-			if ($data['new']['redirect_type'] == 'proxy' && trim($data['new']['proxy_directives'] != '')) {
-				$final_proxy_directives = array();
-				$proxy_directives = $data['new']['proxy_directives'];
-				// Make sure we only have Unix linebreaks
-				$proxy_directives = str_replace("\r\n", "\n", $proxy_directives);
-				$proxy_directives = str_replace("\r", "\n", $proxy_directives);
-				$proxy_directive_lines = explode("\n", $proxy_directives);
-
-				if (is_array($proxy_directive_lines) && !empty($proxy_directive_lines)) {
-					foreach ($proxy_directive_lines as $proxy_directive_line) {
-						$final_proxy_directives[] = array('proxy_directive' => $proxy_directive_line);
-					}
-				}
-			} else {
-				$final_proxy_directives = false;
 			}
 
 			switch($data['new']['subdomain']) {
 				case 'www':
 					$exclude_own_hostname = '';
 
-					if (substr($data['new']['redirect_path'],0,1) == '/') { // relative path
-						if ($data['new']['redirect_type'] == 'proxy') {
-							$vhost_data['web_document_root_www_proxy'] = 'root '.$vhost_data['web_document_root_www'].';';
-							$vhost_data['web_document_root_www'] .= substr($data['new']['redirect_path'],0,-1);
-							break;
-						}
-						$rewrite_exclude = '(?!/\b('.substr($data['new']['redirect_path'],1,-1).(substr($data['new']['redirect_path'],1,-1) != ''? '|': '').'stats'.($vhost_data['errordocs'] == 1 ? '|error' : '').')\b)/';
+					if (substr($data['new']['redirect_path'], 0, 1) == '/') { // relative path
+						$rewrite_exclude = '(?!/\b('.substr($data['new']['redirect_path'], 1, -1).(substr($data['new']['redirect_path'], 1, -1) != ''? '|': '').'stats'.($vhost_data['errordocs'] == 1 ? '|error' : '').')\b)/';
 					} else { // URL - check if URL is local
 						$tmp_redirect_path = $data['new']['redirect_path'];
 
-						if (substr($tmp_redirect_path,0,7) == '$scheme') {
+						if (substr($tmp_redirect_path, 0, 7) == '$scheme') {
 							$tmp_redirect_path = 'http'.substr($tmp_redirect_path,7);
 						}
 
@@ -1080,73 +482,48 @@ class nginx_reverse_proxy_plugin {
 
 						if (($tmp_redirect_path_parts['host'] == $data['new']['domain'] || $tmp_redirect_path_parts['host'] == 'www.'.$data['new']['domain']) && ($tmp_redirect_path_parts['port'] == '80' || $tmp_redirect_path_parts['port'] == '443' || !isset($tmp_redirect_path_parts['port']))) {
 							// URL is local
-							if (substr($tmp_redirect_path_parts['path'],-1) == '/') {
-								$tmp_redirect_path_parts['path'] = substr($tmp_redirect_path_parts['path'],0,-1);
+							if (substr($tmp_redirect_path_parts['path'], -1) == '/') {
+								$tmp_redirect_path_parts['path'] = substr($tmp_redirect_path_parts['path'], 0, -1);
 							}
 
-							if (substr($tmp_redirect_path_parts['path'],0,1) != '/') {
+							if (substr($tmp_redirect_path_parts['path'], 0, 1) != '/') {
 								$tmp_redirect_path_parts['path'] = '/'.$tmp_redirect_path_parts['path'];
 							}
 
 							//$rewrite_exclude = '((?!'.$tmp_redirect_path_parts['path'].'))';
-							if ($data['new']['redirect_type'] == 'proxy') {
-								$vhost_data['web_document_root_www_proxy'] = 'root '.$vhost_data['web_document_root_www'].';';
-								$vhost_data['web_document_root_www'] .= $tmp_redirect_path_parts['path'];
-								break;
-							} else {
-								$rewrite_exclude = '(?!/\b('.substr($tmp_redirect_path_parts['path'],1).(substr($tmp_redirect_path_parts['path'],1) != ''? '|': '').'stats'.($vhost_data['errordocs'] == 1 ? '|error' : '').')\b)/';
+							if ($data['new']['redirect_type'] != 'proxy') {
+								$rewrite_exclude = '(?!/\b('.substr($tmp_redirect_path_parts['path'], 1).(substr($tmp_redirect_path_parts['path'], 1) != ''? '|': '').'stats'.($vhost_data['errordocs'] == 1 ? '|error' : '').')\b)/';
 								$exclude_own_hostname = $tmp_redirect_path_parts['host'];
 							}
 						} else {
 							// external URL
 							$rewrite_exclude = '(.?)/';
-							if ($data['new']['redirect_type'] == 'proxy') {
-								$vhost_data['use_proxy'] = 'y';
-								$rewrite_subdir = $tmp_redirect_path_parts['path'];
-								if (substr($rewrite_subdir,0,1) == '/') {
-									$rewrite_subdir = substr($rewrite_subdir,1);
-								}
-
-								if (substr($rewrite_subdir,-1) != '/') {
-									$rewrite_subdir .= '/';
-								}
-
-								if ($rewrite_subdir == '/') {
-									$rewrite_subdir = '';
-								}
-							}
 						}
 
 						unset($tmp_redirect_path);
 						unset($tmp_redirect_path_parts);
 					}
 
-					$own_rewrite_rules[] = array(	'rewrite_domain' 	=> '^'.$this->_rewrite_quote($data['new']['domain']),
-						'rewrite_type' 		=> ($data['new']['redirect_type'] == 'no')?'':$data['new']['redirect_type'],
-						'rewrite_target' 	=> $data['new']['redirect_path'],
-						'rewrite_exclude'	=> $rewrite_exclude,
-						'rewrite_subdir'	=> $rewrite_subdir,
-						'exclude_own_hostname' => $exclude_own_hostname,
-						'proxy_directives'	=> $final_proxy_directives,
-						'use_rewrite'	=> ($data['new']['redirect_type'] == 'proxy' ? false:true),
-						'use_proxy'	=> ($data['new']['redirect_type'] == 'proxy' ? true:false));
-					break;
+					$own_rewrite_rules[] = array(
+						'rewrite_domain'		=> '^'.$this->_rewrite_quote($data['new']['domain']),
+						'rewrite_type' 			=> ($data['new']['redirect_type'] == 'no') ? '' : $data['new']['redirect_type'],
+						'rewrite_target'		=> $data['new']['redirect_path'],
+						'rewrite_exclude'		=> $rewrite_exclude,
+						'rewrite_subdir'		=> $rewrite_subdir,
+						'exclude_own_hostname'	=> $exclude_own_hostname,
+						'use_rewrite'			=> true
+					);
+				break;
 				case '*':
 					$exclude_own_hostname = '';
 
-					if (substr($data['new']['redirect_path'],0,1) == '/') { // relative path
-						if ($data['new']['redirect_type'] == 'proxy') {
-							$vhost_data['web_document_root_www_proxy'] = 'root '.$vhost_data['web_document_root_www'].';';
-							$vhost_data['web_document_root_www'] .= substr($data['new']['redirect_path'],0,-1);
-							break;
-						}
-
-						$rewrite_exclude = '(?!/\b('.substr($data['new']['redirect_path'],1,-1).(substr($data['new']['redirect_path'],1,-1) != ''? '|': '').'stats'.($vhost_data['errordocs'] == 1 ? '|error' : '').')\b)/';
+					if (substr($data['new']['redirect_path'], 0, 1) == '/') { // relative path
+						$rewrite_exclude = '(?!/\b('.substr($data['new']['redirect_path'], 1, -1).(substr($data['new']['redirect_path'], 1, -1) != ''? '|': '').'stats'.($vhost_data['errordocs'] == 1 ? '|error' : '').')\b)/';
 					} else { // URL - check if URL is local
 						$tmp_redirect_path = $data['new']['redirect_path'];
 
-						if (substr($tmp_redirect_path,0,7) == '$scheme') {
-							$tmp_redirect_path = 'http'.substr($tmp_redirect_path,7);
+						if (substr($tmp_redirect_path, 0, 7) == '$scheme') {
+							$tmp_redirect_path = 'http'.substr($tmp_redirect_path, 7);
 						}
 
 						$tmp_redirect_path_parts = parse_url($tmp_redirect_path);
@@ -1154,130 +531,84 @@ class nginx_reverse_proxy_plugin {
 						//if ($is_serveralias && ($tmp_redirect_path_parts['port'] == '80' || $tmp_redirect_path_parts['port'] == '443' || !isset($tmp_redirect_path_parts['port']))) {
 						if ($this->url_is_local($tmp_redirect_path_parts['host'], $data['new']['domain_id']) && ($tmp_redirect_path_parts['port'] == '80' || $tmp_redirect_path_parts['port'] == '443' || !isset($tmp_redirect_path_parts['port']))) {
 							// URL is local
-							if (substr($tmp_redirect_path_parts['path'],-1) == '/') {
-								$tmp_redirect_path_parts['path'] = substr($tmp_redirect_path_parts['path'],0,-1);
+							if (substr($tmp_redirect_path_parts['path'], -1) == '/') {
+								$tmp_redirect_path_parts['path'] = substr($tmp_redirect_path_parts['path'], 0, -1);
 							}
 
-							if (substr($tmp_redirect_path_parts['path'],0,1) != '/') {
+							if (substr($tmp_redirect_path_parts['path'], 0, 1) != '/') {
 								$tmp_redirect_path_parts['path'] = '/'.$tmp_redirect_path_parts['path'];
 							}
 
 							//$rewrite_exclude = '((?!'.$tmp_redirect_path_parts['path'].'))';
-							if ($data['new']['redirect_type'] == 'proxy') {
-								$vhost_data['web_document_root_www_proxy'] = 'root '.$vhost_data['web_document_root_www'].';';
-								$vhost_data['web_document_root_www'] .= $tmp_redirect_path_parts['path'];
-								break;
-							} else {
-								$rewrite_exclude = '(?!/\b('.substr($tmp_redirect_path_parts['path'],1).(substr($tmp_redirect_path_parts['path'],1) != ''? '|': '').'stats'.($vhost_data['errordocs'] == 1 ? '|error' : '').')\b)/';
+							if ($data['new']['redirect_type'] != 'proxy') {
+								$rewrite_exclude = '(?!/\b('.substr($tmp_redirect_path_parts['path'], 1).(substr($tmp_redirect_path_parts['path'], 1) != ''? '|': '').'stats'.($vhost_data['errordocs'] == 1 ? '|error' : '').')\b)/';
 								$exclude_own_hostname = $tmp_redirect_path_parts['host'];
 							}
 						} else {
 							// external URL
 							$rewrite_exclude = '(.?)/';
-							if ($data['new']['redirect_type'] == 'proxy') {
-								$vhost_data['use_proxy'] = 'y';
-								$rewrite_subdir = $tmp_redirect_path_parts['path'];
-								if (substr($rewrite_subdir,0,1) == '/') {
-									$rewrite_subdir = substr($rewrite_subdir,1);
-								}
-
-								if (substr($rewrite_subdir,-1) != '/') {
-									$rewrite_subdir .= '/';
-								}
-
-								if ($rewrite_subdir == '/') {
-									$rewrite_subdir = '';
-								}
-							}
 						}
 
 						unset($tmp_redirect_path);
 						unset($tmp_redirect_path_parts);
 					}
-					$own_rewrite_rules[] = array(	'rewrite_domain' 	=> '(^|\.)'.$this->_rewrite_quote($data['new']['domain']),
-						'rewrite_type' 		=> ($data['new']['redirect_type'] == 'no')?'':$data['new']['redirect_type'],
-						'rewrite_target' 	=> $data['new']['redirect_path'],
-						'rewrite_exclude'	=> $rewrite_exclude,
-						'rewrite_subdir'	=> $rewrite_subdir,
-						'exclude_own_hostname' => $exclude_own_hostname,
-						'proxy_directives'	=> $final_proxy_directives,
-						'use_rewrite'	=> ($data['new']['redirect_type'] == 'proxy' ? false:true),
-						'use_proxy'	=> ($data['new']['redirect_type'] == 'proxy' ? true:false));
-					break;
+
+					$own_rewrite_rules[] = array(
+						'rewrite_domain' 		=> '(^|\.)'.$this->_rewrite_quote($data['new']['domain']),
+						'rewrite_type' 			=> ($data['new']['redirect_type'] == 'no') ? '' : $data['new']['redirect_type'],
+						'rewrite_target' 		=> $data['new']['redirect_path'],
+						'rewrite_exclude'		=> $rewrite_exclude,
+						'rewrite_subdir'		=> $rewrite_subdir,
+						'exclude_own_hostname' 	=> $exclude_own_hostname,
+						'use_rewrite'			=> true
+					);
+				break;
 				default:
-					if (substr($data['new']['redirect_path'],0,1) == '/') { // relative path
+					if (substr($data['new']['redirect_path'], 0, 1) == '/') { // relative path
 						$exclude_own_hostname = '';
-
-						if ($data['new']['redirect_type'] == 'proxy') {
-							$vhost_data['web_document_root_www_proxy'] = 'root '.$vhost_data['web_document_root_www'].';';
-							$vhost_data['web_document_root_www'] .= substr($data['new']['redirect_path'],0,-1);
-							break;
-						}
-
-						$rewrite_exclude = '(?!/\b('.substr($data['new']['redirect_path'],1,-1).(substr($data['new']['redirect_path'],1,-1) != ''? '|': '').'stats'.($vhost_data['errordocs'] == 1 ? '|error' : '').')\b)/';
+						$rewrite_exclude = '(?!/\b('.substr($data['new']['redirect_path'], 1, -1).(substr($data['new']['redirect_path'], 1, -1) != ''? '|': '').'stats'.($vhost_data['errordocs'] == 1 ? '|error' : '').')\b)/';
 					} else { // URL - check if URL is local
 						$tmp_redirect_path = $data['new']['redirect_path'];
 
-						if (substr($tmp_redirect_path,0,7) == '$scheme') {
-							$tmp_redirect_path = 'http'.substr($tmp_redirect_path,7);
+						if (substr($tmp_redirect_path, 0, 7) == '$scheme') {
+							$tmp_redirect_path = 'http'.substr($tmp_redirect_path, 7);
 						}
 
 						$tmp_redirect_path_parts = parse_url($tmp_redirect_path);
 
 						if ($tmp_redirect_path_parts['host'] == $data['new']['domain'] && ($tmp_redirect_path_parts['port'] == '80' || $tmp_redirect_path_parts['port'] == '443' || !isset($tmp_redirect_path_parts['port']))) {
 							// URL is local
-							if (substr($tmp_redirect_path_parts['path'],-1) == '/') {
-								$tmp_redirect_path_parts['path'] = substr($tmp_redirect_path_parts['path'],0,-1);
+							if (substr($tmp_redirect_path_parts['path'], -1) == '/') {
+								$tmp_redirect_path_parts['path'] = substr($tmp_redirect_path_parts['path'], 0, -1);
 							}
 
-							if (substr($tmp_redirect_path_parts['path'],0,1) != '/') {
+							if (substr($tmp_redirect_path_parts['path'], 0, 1) != '/') {
 								$tmp_redirect_path_parts['path'] = '/'.$tmp_redirect_path_parts['path'];
 							}
 
 							//$rewrite_exclude = '((?!'.$tmp_redirect_path_parts['path'].'))';
-							if ($data['new']['redirect_type'] == 'proxy') {
-								$vhost_data['web_document_root_www_proxy'] = 'root '.$vhost_data['web_document_root_www'].';';
-								$vhost_data['web_document_root_www'] .= $tmp_redirect_path_parts['path'];
-								break;
-							} else {
-								$rewrite_exclude = '(?!/\b('.substr($tmp_redirect_path_parts['path'],1).(substr($tmp_redirect_path_parts['path'],1) != ''? '|': '').'stats'.($vhost_data['errordocs'] == 1 ? '|error' : '').')\b)/';
+							if ($data['new']['redirect_type'] != 'proxy') {
+								$rewrite_exclude = '(?!/\b('.substr($tmp_redirect_path_parts['path'], 1).(substr($tmp_redirect_path_parts['path'], 1) != ''? '|': '').'stats'.($vhost_data['errordocs'] == 1 ? '|error' : '').')\b)/';
 								$exclude_own_hostname = $tmp_redirect_path_parts['host'];
 							}
 						} else {
 							// external URL
 							$rewrite_exclude = '(.?)/';
-
-							if ($data['new']['redirect_type'] == 'proxy') {
-								$vhost_data['use_proxy'] = 'y';
-								$rewrite_subdir = $tmp_redirect_path_parts['path'];
-
-								if (substr($rewrite_subdir,0,1) == '/') {
-									$rewrite_subdir = substr($rewrite_subdir,1);
-								}
-
-								if (substr($rewrite_subdir,-1) != '/') {
-									$rewrite_subdir .= '/';
-								}
-
-								if ($rewrite_subdir == '/') {
-									$rewrite_subdir = '';
-								}
-							}
 						}
 
 						unset($tmp_redirect_path);
 						unset($tmp_redirect_path_parts);
 					}
 
-					$own_rewrite_rules[] = array(	'rewrite_domain' 	=> '^'.$this->_rewrite_quote($data['new']['domain']),
-						'rewrite_type' 		=> ($data['new']['redirect_type'] == 'no')?'':$data['new']['redirect_type'],
-						'rewrite_target' 	=> $data['new']['redirect_path'],
-						'rewrite_exclude'	=> $rewrite_exclude,
-						'rewrite_subdir'	=> $rewrite_subdir,
-						'exclude_own_hostname' => $exclude_own_hostname,
-						'proxy_directives'	=> $final_proxy_directives,
-						'use_rewrite'	=> ($data['new']['redirect_type'] == 'proxy' ? false:true),
-						'use_proxy'	=> ($data['new']['redirect_type'] == 'proxy' ? true:false));
+					$own_rewrite_rules[] = array(
+						'rewrite_domain' 		=> '^'.$this->_rewrite_quote($data['new']['domain']),
+						'rewrite_type' 			=> ($data['new']['redirect_type'] == 'no') ? '' : $data['new']['redirect_type'],
+						'rewrite_target' 		=> $data['new']['redirect_path'],
+						'rewrite_exclude'		=> $rewrite_exclude,
+						'rewrite_subdir'		=> $rewrite_subdir,
+						'exclude_own_hostname' 	=> $exclude_own_hostname,
+						'use_rewrite'			=> true
+					);
 			}
 		}
 
@@ -1300,10 +631,10 @@ class nginx_reverse_proxy_plugin {
 		switch($data['new']['subdomain']) {
 			case 'www':
 				$server_alias[] = 'www.'.$data['new']['domain'].' ';
-				break;
+			break;
 			case '*':
 				$server_alias[] = '*.'.$data['new']['domain'].' ';
-				break;
+			break;
 		}
 
 		// get alias domains (co-domains and subdomains)
@@ -1312,38 +643,19 @@ class nginx_reverse_proxy_plugin {
 
 		if (is_array($aliases)) {
 			foreach ($aliases as $alias) {
-				// Custom proxy directives
-				if ($alias['redirect_type'] == 'proxy' && trim($alias['proxy_directives'] != '')) {
-					$final_proxy_directives = array();
-					$proxy_directives = $alias['proxy_directives'];
-					// Make sure we only have Unix linebreaks
-					$proxy_directives = str_replace("\r\n", "\n", $proxy_directives);
-					$proxy_directives = str_replace("\r", "\n", $proxy_directives);
-					$proxy_directive_lines = explode("\n", $proxy_directives);
-
-					if (is_array($proxy_directive_lines) && !empty($proxy_directive_lines)) {
-						foreach ($proxy_directive_lines as $proxy_directive_line) {
-							$final_proxy_directives[] = array('proxy_directive' => $proxy_directive_line);
-						}
-					}
-				} else {
-					$final_proxy_directives = false;
-				}
-
-				if ($alias['redirect_type'] == '' || $alias['redirect_path'] == '' || substr($alias['redirect_path'],0,1) == '/') {
+				if ($alias['redirect_type'] == '' || $alias['redirect_path'] == '' || substr($alias['redirect_path'], 0, 1) == '/') {
 					switch($alias['subdomain']) {
 						case 'www':
 							$server_alias[] = 'www.'.$alias['domain'].' '.$alias['domain'].' ';
-							break;
+						break;
 						case '*':
 							$server_alias[] = '*.'.$alias['domain'].' '.$alias['domain'].' ';
-							break;
+						break;
 						default:
 							$server_alias[] = $alias['domain'].' ';
-							break;
 					}
 
-					$app->log('Add server alias: '.$alias['domain'],LOGLEVEL_DEBUG);
+					$app->log('Add server alias: '.$alias['domain'], LOGLEVEL_DEBUG);
 
 					// Add SEO redirects for alias domains
 					if ($alias['seo_redirect'] != '' && $data['new']['seo_redirect'] != '*_to_www_domain_tld' && $data['new']['seo_redirect'] != '*_to_domain_tld' && ($alias['type'] == 'alias' || ($alias['type'] == 'subdomain' && $data['new']['seo_redirect'] != '*_domain_tld_to_www_domain_tld' && $data['new']['seo_redirect'] != '*_domain_tld_to_domain_tld'))) {
@@ -1356,83 +668,72 @@ class nginx_reverse_proxy_plugin {
 				}
 
 				// Local Rewriting (inside vhost server {} container)
-				if ($alias['redirect_type'] != '' && substr($alias['redirect_path'],0,1) == '/' && $alias['redirect_type'] != 'proxy') {  // proxy makes no sense with local path
-					if (substr($alias['redirect_path'],-1) != '/') {
+				if ($alias['redirect_type'] != '' && substr($alias['redirect_path'], 0, 1) == '/' && $alias['redirect_type'] != 'proxy') {  // proxy makes no sense with local path
+					if (substr($alias['redirect_path'], -1) != '/') {
 						$alias['redirect_path'] .= '/';
 					}
 
-					$rewrite_exclude = '(?!/\b('.substr($alias['redirect_path'],1,-1).(substr($alias['redirect_path'],1,-1) != ''? '|': '').'stats'.($vhost_data['errordocs'] == 1 ? '|error' : '').')\b)/';
+					$rewrite_exclude = '(?!/\b('.substr($alias['redirect_path'], 1, -1).(substr($alias['redirect_path'], 1, -1) != ''? '|': '').'stats'.($vhost_data['errordocs'] == 1 ? '|error' : '').')\b)/';
 					switch($alias['subdomain']) {
 						case 'www':
 							// example.com
-							$local_rewrite_rules[] = array(	'local_redirect_origin_domain' 	=> $alias['domain'],
-								'local_redirect_operator'	=> '=',
-								'local_redirect_exclude' => $rewrite_exclude,
-								'local_redirect_target' => $alias['redirect_path'],
-								'local_redirect_type' => ($alias['redirect_type'] == 'no')?'':$alias['redirect_type']);
+							$local_rewrite_rules[] = array(
+								'local_redirect_origin_domain' 	=> $alias['domain'],
+								'local_redirect_operator'		=> '=',
+								'local_redirect_exclude' 		=> $rewrite_exclude,
+								'local_redirect_target' 		=> $alias['redirect_path'],
+								'local_redirect_type' 			=> ($alias['redirect_type'] == 'no') ? '' : $alias['redirect_type']
+							);
 
 							// www.example.com
-							$local_rewrite_rules[] = array(	'local_redirect_origin_domain' 	=> 'www.'.$alias['domain'],
-								'local_redirect_operator'	=> '=',
-								'local_redirect_exclude' => $rewrite_exclude,
-								'local_redirect_target' => $alias['redirect_path'],
-								'local_redirect_type' => ($alias['redirect_type'] == 'no')?'':$alias['redirect_type']);
-							break;
+							$local_rewrite_rules[] = array(
+								'local_redirect_origin_domain' 	=> 'www.'.$alias['domain'],
+								'local_redirect_operator'		=> '=',
+								'local_redirect_exclude' 		=> $rewrite_exclude,
+								'local_redirect_target' 		=> $alias['redirect_path'],
+								'local_redirect_type' 			=> ($alias['redirect_type'] == 'no') ? '' : $alias['redirect_type']
+							);
+						break;
 						case '*':
-							$local_rewrite_rules[] = array(	'local_redirect_origin_domain' 	=> '^('.str_replace('.', '\.', $alias['domain']).'|.+\.'.str_replace('.', '\.', $alias['domain']).')$',
-								'local_redirect_operator'	=> '~*',
-								'local_redirect_exclude' => $rewrite_exclude,
-								'local_redirect_target' => $alias['redirect_path'],
-								'local_redirect_type' => ($alias['redirect_type'] == 'no')?'':$alias['redirect_type']);
-							break;
+							$local_rewrite_rules[] = array(
+								'local_redirect_origin_domain' 	=> '^('.str_replace('.', '\.', $alias['domain']).'|.+\.'.str_replace('.', '\.', $alias['domain']).')$',
+								'local_redirect_operator'		=> '~*',
+								'local_redirect_exclude'		=> $rewrite_exclude,
+								'local_redirect_target' 		=> $alias['redirect_path'],
+								'local_redirect_type' 			=> ($alias['redirect_type'] == 'no') ? '' : $alias['redirect_type']
+							);
+						break;
 						default:
-							$local_rewrite_rules[] = array(	'local_redirect_origin_domain' 	=> $alias['domain'],
-								'local_redirect_operator'	=> '=',
-								'local_redirect_exclude' => $rewrite_exclude,
-								'local_redirect_target' => $alias['redirect_path'],
-								'local_redirect_type' => ($alias['redirect_type'] == 'no')?'':$alias['redirect_type']);
+							$local_rewrite_rules[] = array(
+								'local_redirect_origin_domain' 	=> $alias['domain'],
+								'local_redirect_operator'		=> '=',
+								'local_redirect_exclude' 		=> $rewrite_exclude,
+								'local_redirect_target' 		=> $alias['redirect_path'],
+								'local_redirect_type' 			=> ($alias['redirect_type'] == 'no') ? '' : $alias['redirect_type']
+							);
 					}
 				}
 
 				// External Rewriting (extra server {} containers)
-				if ($alias['redirect_type'] != '' && $alias['redirect_path'] != '' && substr($alias['redirect_path'],0,1) != '/') {
-					if (substr($alias['redirect_path'],-1) != '/') {
+				if ($alias['redirect_type'] != '' && $alias['redirect_path'] != '' && substr($alias['redirect_path'], 0, 1) != '/') {
+					if (substr($alias['redirect_path'], -1) != '/') {
 						$alias['redirect_path'] .= '/';
 					}
 
-					if (substr($alias['redirect_path'],0,8) == '[scheme]') {
+					if (substr($alias['redirect_path'], 0, 8) == '[scheme]') {
 						if ($alias['redirect_type'] != 'proxy') {
-							$alias['redirect_path'] = '$scheme'.substr($alias['redirect_path'],8);
-						} else {
-							$alias['redirect_path'] = 'http'.substr($alias['redirect_path'],8);
+							$alias['redirect_path'] = '$scheme'.substr($alias['redirect_path'], 8);
 						}
 					}
 
 					switch($alias['subdomain']) {
 						case 'www':
-							if ($alias['redirect_type'] == 'proxy') {
-								$tmp_redirect_path = $alias['redirect_path'];
-								$tmp_redirect_path_parts = parse_url($tmp_redirect_path);
-								$rewrite_subdir = $tmp_redirect_path_parts['path'];
-
-								if (substr($rewrite_subdir,0,1) == '/') {
-									$rewrite_subdir = substr($rewrite_subdir,1);
-								}
-
-								if (substr($rewrite_subdir,-1) != '/') {
-									$rewrite_subdir .= '/';
-								}
-
-								if ($rewrite_subdir == '/') {
-									$rewrite_subdir = '';
-								}
-							}
-
 							if ($alias['redirect_type'] != 'proxy') {
-								if (substr($alias['redirect_path'],-1) == '/') {
-									$alias['redirect_path'] = substr($alias['redirect_path'],0,-1);
+								if (substr($alias['redirect_path'], -1) == '/') {
+									$alias['redirect_path'] = substr($alias['redirect_path'], 0, -1);
 								}
 							}
+
 							// Add SEO redirects for alias domains
 							$alias_seo_redirects2 = array();
 							if ($alias['seo_redirect'] != '') {
@@ -1443,13 +744,12 @@ class nginx_reverse_proxy_plugin {
 								}
 							}
 
-							$rewrite_rules[] = array(	'rewrite_domain' 	=> $alias['domain'],
-								'rewrite_type' 		=> ($alias['redirect_type'] == 'no')?'':$alias['redirect_type'],
+							$rewrite_rules[] = array(
+								'rewrite_domain' 	=> $alias['domain'],
+								'rewrite_type' 		=> ($alias['redirect_type'] == 'no') ? '' : $alias['redirect_type'],
 								'rewrite_target' 	=> $alias['redirect_path'],
 								'rewrite_subdir'	=> $rewrite_subdir,
-								'proxy_directives'	=> $final_proxy_directives,
-								'use_rewrite'	=> ($alias['redirect_type'] == 'proxy' ? false:true),
-								'use_proxy'	=> ($alias['redirect_type'] == 'proxy' ? true:false),
+								'use_rewrite'		=> true,
 								'alias_seo_redirects2' => (count($alias_seo_redirects2) > 0 ? $alias_seo_redirects2 : false));
 
 							// Add SEO redirects for alias domains
@@ -1463,38 +763,20 @@ class nginx_reverse_proxy_plugin {
 							}
 
 							$rewrite_rules[] = array(	'rewrite_domain' 	=> 'www.'.$alias['domain'],
-								'rewrite_type' 		=> ($alias['redirect_type'] == 'no')?'':$alias['redirect_type'],
+								'rewrite_type' 		=> ($alias['redirect_type'] == 'no') ? '' : $alias['redirect_type'],
 								'rewrite_target' 	=> $alias['redirect_path'],
 								'rewrite_subdir'	=> $rewrite_subdir,
-								'proxy_directives'	=> $final_proxy_directives,
-								'use_rewrite'	=> ($alias['redirect_type'] == 'proxy' ? false:true),
-								'use_proxy'	=> ($alias['redirect_type'] == 'proxy' ? true:false),
-								'alias_seo_redirects2' => (count($alias_seo_redirects2) > 0 ? $alias_seo_redirects2 : false));
-							break;
+								'use_rewrite'		=> true,
+								'alias_seo_redirects2' => (count($alias_seo_redirects2) > 0 ? $alias_seo_redirects2 : false)
+							);
+						break;
 						case '*':
-							if ($alias['redirect_type'] == 'proxy') {
-								$tmp_redirect_path = $alias['redirect_path'];
-								$tmp_redirect_path_parts = parse_url($tmp_redirect_path);
-								$rewrite_subdir = $tmp_redirect_path_parts['path'];
-
-								if (substr($rewrite_subdir,0,1) == '/') {
-									$rewrite_subdir = substr($rewrite_subdir,1);
-								}
-
-								if (substr($rewrite_subdir,-1) != '/') {
-									$rewrite_subdir .= '/';
-								}
-
-								if ($rewrite_subdir == '/') {
-									$rewrite_subdir = '';
-								}
-							}
-
 							if ($alias['redirect_type'] != 'proxy') {
-								if (substr($alias['redirect_path'],-1) == '/') {
-									$alias['redirect_path'] = substr($alias['redirect_path'],0,-1);
+								if (substr($alias['redirect_path'], -1) == '/') {
+									$alias['redirect_path'] = substr($alias['redirect_path'], 0, -1);
 								}
 							}
+
 							// Add SEO redirects for alias domains
 							$alias_seo_redirects2 = array();
 							if ($alias['seo_redirect'] != '') {
@@ -1505,15 +787,15 @@ class nginx_reverse_proxy_plugin {
 								}
 							}
 
-							$rewrite_rules[] = array(	'rewrite_domain' 	=> $alias['domain'].' *.'.$alias['domain'],
-								'rewrite_type' 		=> ($alias['redirect_type'] == 'no')?'':$alias['redirect_type'],
+							$rewrite_rules[] = array(
+								'rewrite_domain' 	=> $alias['domain'].' *.'.$alias['domain'],
+								'rewrite_type' 		=> ($alias['redirect_type'] == 'no') ? '' : $alias['redirect_type'],
 								'rewrite_target' 	=> $alias['redirect_path'],
 								'rewrite_subdir'	=> $rewrite_subdir,
-								'proxy_directives'	=> $final_proxy_directives,
-								'use_rewrite'	=> ($alias['redirect_type'] == 'proxy' ? false:true),
-								'use_proxy'	=> ($alias['redirect_type'] == 'proxy' ? true:false),
-								'alias_seo_redirects2' => (count($alias_seo_redirects2) > 0 ? $alias_seo_redirects2 : false));
-							break;
+								'use_rewrite'		=> true,
+								'alias_seo_redirects2' => (count($alias_seo_redirects2) > 0 ? $alias_seo_redirects2 : false)
+							);
+						break;
 						default:
 							if ($alias['redirect_type'] == 'proxy') {
 								$tmp_redirect_path = $alias['redirect_path'];
@@ -1559,14 +841,14 @@ class nginx_reverse_proxy_plugin {
 								}
 							}
 
-							$rewrite_rules[] = array(	'rewrite_domain' 	=> $domain_rule,
-								'rewrite_type' 		=> ($alias['redirect_type'] == 'no')?'':$alias['redirect_type'],
+							$rewrite_rules[] = array(
+								'rewrite_domain' 	=> $domain_rule,
+								'rewrite_type' 		=> ($alias['redirect_type'] == 'no') ? '' : $alias['redirect_type'],
 								'rewrite_target' 	=> $alias['redirect_path'],
 								'rewrite_subdir'	=> $rewrite_subdir,
-								'proxy_directives'	=> $final_proxy_directives,
-								'use_rewrite'	=> ($alias['redirect_type'] == 'proxy' ? false:true),
-								'use_proxy'	=> ($alias['redirect_type'] == 'proxy' ? true:false),
-								'alias_seo_redirects2' => (count($alias_seo_redirects2) > 0 ? $alias_seo_redirects2 : false));
+								'use_rewrite'		=> true,
+								'alias_seo_redirects2' => (count($alias_seo_redirects2) > 0 ? $alias_seo_redirects2 : false)
+							);
 					}
 				}
 			}
@@ -1582,25 +864,25 @@ class nginx_reverse_proxy_plugin {
 			}
 
 			unset($tmp_alias);
-			$tpl->setVar('alias',trim($server_alias_str));
+			$tpl->setVar('alias', trim($server_alias_str));
 		} else {
 			$tpl->setVar('alias','');
 		}
 
 		if (count($rewrite_rules) > 0) {
-			$tpl->setLoop('redirects',$rewrite_rules);
+			$tpl->setLoop('redirects', $rewrite_rules);
 		}
 
 		if (count($own_rewrite_rules) > 0) {
-			$tpl->setLoop('own_redirects',$own_rewrite_rules);
+			$tpl->setLoop('own_redirects', $own_rewrite_rules);
 		}
 
 		if (count($local_rewrite_rules) > 0) {
-			$tpl->setLoop('local_redirects',$local_rewrite_rules);
+			$tpl->setLoop('local_redirects', $local_rewrite_rules);
 		}
 
 		if (count($alias_seo_redirects) > 0) {
-			$tpl->setLoop('alias_seo_redirects',$alias_seo_redirects);
+			$tpl->setLoop('alias_seo_redirects', $alias_seo_redirects);
 		}
 
 		//* Create basic http auth for website statistics
@@ -1621,8 +903,8 @@ class nginx_reverse_proxy_plugin {
 		}
 
 		//* Write vhost file
-		$app->system->file_put_contents($vhost_file,$this->nginx_merge_locations($tpl->grab()));
-		$app->log('Writing the vhost file: '.$vhost_file,LOGLEVEL_DEBUG);
+		$app->system->file_put_contents($vhost_file, $this->nginx_merge_locations($tpl->grab()));
+		$app->log('Writing the vhost file: '.$vhost_file, LOGLEVEL_DEBUG);
 		unset($tpl);
 
 		//* Set the symlink to enable the vhost
@@ -1634,7 +916,7 @@ class nginx_reverse_proxy_plugin {
 		}
 
 		//* Remove old or changed symlinks
-		if ($data['new']['subdomain'] != $data['old']['subdomain'] or $data['new']['active'] == 'n') {
+		if ($data['new']['subdomain'] != $data['old']['subdomain'] || $data['new']['active'] == 'n') {
 			$vhost_symlink = escapeshellcmd($web_config['nginx_vhost_conf_enabled_dir'].'/900-'.$data['new']['domain'].'.vhost');
 
 			if (is_link($vhost_symlink)) {
@@ -1690,122 +972,7 @@ class nginx_reverse_proxy_plugin {
 			$app->log('Removing file: '.$vhost_file,LOGLEVEL_DEBUG);
 		}
 
-		// create password file for stats directory
-		if (!is_file($data['new']['document_root'].'/web/stats/.htpasswd_stats') || $data['new']['stats_password'] != $data['old']['stats_password']) {
-			if (trim($data['new']['stats_password']) != '') {
-				$htp_file = 'admin:'.trim($data['new']['stats_password']);
-				$app->system->file_put_contents($data['new']['document_root'].'/web/stats/.htpasswd_stats',$htp_file);
-				$app->system->chmod($data['new']['document_root'].'/web/stats/.htpasswd_stats',0755);
-				unset($htp_file);
-			}
-		}
-
-		//* Create awstats configuration
-		if ($data['new']['stats_type'] == 'awstats' && ($data['new']['type'] == 'vhost' || $data['new']['type'] == 'vhostsubdomain')) {
-			$this->awstats_update($data,$web_config);
-		}
-
-		$this->php_fpm_pool_update($data,$web_config,$pool_dir,$pool_name,$socket_dir);
-
-		if ($web_config['check_apache_config'] == 'y') {
-			//* Test if nginx starts with the new configuration file
-			$nginx_online_status_before_restart = $this->_checkTcp('localhost',80);
-			$app->log('nginx status is: '.($nginx_online_status_before_restart === true? 'running' : 'down'),LOGLEVEL_DEBUG);
-
-			$retval = $app->services->restartService('httpd','restart'); // $retval['retval'] is 0 on success and > 0 on failure
-			$app->log('nginx restart return value is: '.$retval['retval'],LOGLEVEL_DEBUG);
-
-			// wait a few seconds, before we test the apache status again
-			sleep(2);
-
-			//* Check if nginx restarted successfully if it was online before
-			$nginx_online_status_after_restart = $this->_checkTcp('localhost',80);
-			$app->log('nginx online status after restart is: '.($nginx_online_status_after_restart === true? 'running' : 'down'),LOGLEVEL_DEBUG);
-
-			if ($nginx_online_status_before_restart && !$nginx_online_status_after_restart || $retval['retval'] > 0) {
-				$app->log('nginx did not restart after the configuration change for website '.$data['new']['domain'].'. Reverting the configuration. Saved non-working config as '.$vhost_file.'.err',LOGLEVEL_WARN);
-
-				if (is_array($retval['output']) && !empty($retval['output'])) {
-					$app->log('Reason for nginx restart failure: '.implode("\n", $retval['output']),LOGLEVEL_WARN);
-					$app->dbmaster->datalogError(implode("\n", $retval['output']));
-				} else {
-					// if no output is given, check again
-					exec('nginx -t 2>&1', $tmp_output, $tmp_retval);
-
-					if ($tmp_retval > 0 && is_array($tmp_output) && !empty($tmp_output)) {
-						$app->log('Reason for nginx restart failure: '.implode("\n", $tmp_output),LOGLEVEL_WARN);
-						$app->dbmaster->datalogError(implode("\n", $tmp_output));
-					}
-
-					unset($tmp_output, $tmp_retval);
-				}
-
-				$app->system->copy($vhost_file,$vhost_file.'.err');
-
-				if (is_file($vhost_file.'~')) {
-					//* Copy back the last backup file
-					$app->system->copy($vhost_file.'~',$vhost_file);
-				} else {
-					//* There is no backup file, so we create a empty vhost file with a warning message inside
-					$app->system->file_put_contents($vhost_file,"# nginx did not start after modifying this vhost file.\n# Please check file $vhost_file.err for syntax errors.");
-				}
-
-				if ($this->ssl_certificate_changed === true) {
-					$ssl_dir = $data['new']['document_root'].'/ssl';
-					$domain = $data['new']['ssl_domain'];
-					$key_file = $ssl_dir.'/'.$domain.'.key.org';
-					$key_file2 = $ssl_dir.'/'.$domain.'.key';
-					$csr_file = $ssl_dir.'/'.$domain.'.csr';
-					$crt_file = $ssl_dir.'/'.$domain.'.crt';
-					//$bundle_file = $ssl_dir.'/'.$domain.'.bundle';
-
-					//* Backup the files that might have caused the error
-					if (is_file($key_file)) {
-						$app->system->copy($key_file,$key_file.'.err');
-						$app->system->chmod($key_file.'.err',0400);
-					}
-
-					if (is_file($key_file2)) {
-						$app->system->copy($key_file2,$key_file2.'.err');
-						$app->system->chmod($key_file2.'.err',0400);
-					}
-
-					if (is_file($csr_file)) {
-						$app->system->copy($csr_file,$csr_file.'.err');
-					}
-
-					if (is_file($crt_file)) {
-						$app->system->copy($crt_file,$crt_file.'.err');
-					}
-					//if (is_file($bundle_file)) $app->system->copy($bundle_file,$bundle_file.'.err');
-
-					//* Restore the ~ backup files
-					if (is_file($key_file.'~')) {
-						$app->system->copy($key_file.'~',$key_file);
-					}
-
-					if (is_file($key_file2.'~')) {
-						$app->system->copy($key_file2.'~',$key_file2);
-					}
-
-					if (is_file($crt_file.'~')) {
-						$app->system->copy($crt_file.'~',$crt_file);
-					}
-
-					if (is_file($csr_file.'~')) {
-						$app->system->copy($csr_file.'~',$csr_file);
-					}
-					//if (is_file($bundle_file.'~')) $app->system->copy($bundle_file.'~',$bundle_file);
-
-					$app->log('nginx did not restart after the configuration change for website '.$data['new']['domain'].' Reverting the SSL configuration. Saved non-working SSL files with .err extension.',LOGLEVEL_WARN);
-				}
-
-				$app->services->restartService('httpd','restart');
-			}
-		} else {
-			//* We do not check the nginx config after changes (is faster)
-			$app->services->restartServiceDelayed('httpd','reload');
-		}
+		$app->services->restartServiceDelayed('httpd','reload');
 
 		//* The vhost is written and apache has been restarted, so we
 		// can reset the ssl changed var to false and cleanup some files
@@ -1813,37 +980,18 @@ class nginx_reverse_proxy_plugin {
 
 		$ssl_dir = $data['new']['document_root'].'/ssl';
 		$domain = $data['new']['ssl_domain'];
-		$key_file = $ssl_dir.'/'.$domain.'.key.org';
-		$key_file2 = $ssl_dir.'/'.$domain.'.key';
-		$csr_file = $ssl_dir.'/'.$domain.'.csr';
-		$crt_file = $ssl_dir.'/'.$domain.'.crt';
-		//$bundle_file = $ssl_dir.'/'.$domain.'.bundle';
-
-		if (@is_file($key_file.'~')) {
-			$app->system->unlink($key_file.'~');
-		}
-
-		if (@is_file($key2_file.'~')) {
-			$app->system->unlink($key2_file.'~');
-		}
+		$crt_file = $ssl_dir.'/'.$domain.'.nginx.crt';
 
 		if (@is_file($crt_file.'~')) {
 			$app->system->unlink($crt_file.'~');
 		}
-
-		if (@is_file($csr_file.'~')) {
-			$app->system->unlink($csr_file.'~');
-		}
-		//if (@is_file($bundle_file.'~')) $app->system->unlink($bundle_file.'~');
 
 		// Remove the backup copy of the config file.
 		if (@is_file($vhost_file.'~')) {
 			$app->system->unlink($vhost_file.'~');
 		}
 
-		//* Unset action to clean it for next processed vhost.
 		$this->action = '';
-
 	}
 
 	/**
@@ -2411,6 +1559,7 @@ class nginx_reverse_proxy_plugin {
 
 		//* Create the domain.auth file which is included in the vhost configuration file
 		$app->uses('getconf');
+
 		$web_config = $app->getconf->get_server_config($conf['server_id'], 'web');
 		$basic_auth_file = escapeshellcmd($web_config['nginx_vhost_conf_dir'].'/'.$website['domain'].'.auth');
 
@@ -2419,20 +1568,22 @@ class nginx_reverse_proxy_plugin {
 
 		if (is_array($website_auth_locations) && !empty($website_auth_locations)) {
 			foreach ($website_auth_locations as $website_auth_location) {
-				if (substr($website_auth_location['path'],0,1) == '/') {
-					$website_auth_location['path'] = substr($website_auth_location['path'],1);
+				if (substr($website_auth_location['path'], 0, 1) == '/') {
+					$website_auth_location['path'] = substr($website_auth_location['path'], 1);
 				}
 
-				if (substr($website_auth_location['path'],-1) == '/') {
-					$website_auth_location['path'] = substr($website_auth_location['path'],0,-1);
+				if (substr($website_auth_location['path'], -1) == '/') {
+					$website_auth_location['path'] = substr($website_auth_location['path'], 0, -1);
 				}
 
 				if ($website_auth_location['path'] != '') {
 					$website_auth_location['path'] .= '/';
 				}
 
-				$basic_auth_locations[] = array('htpasswd_location' => '/'.$website_auth_location['path'],
-												'htpasswd_path' => $website['document_root'].'/' . ($website['type'] == 'vhostsubdomain' ? $website['web_folder'] : 'web') . '/'.$website_auth_location['path']);
+				$basic_auth_locations[] = array(
+					'htpasswd_location' => '/'.$website_auth_location['path'],
+					'htpasswd_path' => $website['document_root'].'/' . ($website['type'] == 'vhostsubdomain' ? $website['web_folder'] : 'web') . '/'.$website_auth_location['path']
+				);
 			}
 		}
 
