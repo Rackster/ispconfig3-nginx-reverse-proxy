@@ -1,218 +1,92 @@
+<tmpl_loop name='vhosts'>
 server {
-
-	######################################################################
-	## Server configuration
-	######################################################################
-
-	listen <tmpl_var name='ip_address'>:80;
-
-	<tmpl_if name='ipv6_enabled'>
+#------- Server configuration---------------------------------------------------
+	<tmpl_if name='ssl_enabled'>
+		listen <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'>:</tmpl_if>443 ssl spdy;
+		<tmpl_if name='ipv6_enabled'>
+		listen [<tmpl_var name='ipv6_address'>]:443 ipv6only=on ssl spdy;
+	</tmpl_if>
+	</tmpl_else> 
+		listen <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'>:</tmpl_if>80;
+		<tmpl_if name='ipv6_enabled'>
 		listen [<tmpl_var name='ipv6_address'>]:80 ipv6only=on;
 	</tmpl_if>
-
-	<tmpl_if name='ssl_enabled'>
-		listen <tmpl_var name='ip_address'>:443 ssl spdy;
-
-		<tmpl_if name='ipv6_enabled'>
-			listen [<tmpl_var name='ipv6_address'>]:443 ipv6only=on ssl spdy;
-		</tmpl_if>
 	</tmpl_if>
+server_name <tmpl_var name='domain'> <tmpl_if name='alias'><tmpl_var name='alias'></tmpl_if> <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'></tmpl_if>;
+		root <tmpl_var name='web_document_root_www'>;
 
-	server_name <tmpl_var name='domain'> <tmpl_var name='alias'>;
-
-	root <tmpl_var name='web_document_root_www'>;
-
-	index index.html index.htm index.php index.cgi index.pl index.xhtml;
-
-	######################################################################
-	## Log configuration
-	######################################################################
-
-	access_log off;
-
+#-------- Error page ----------------------------------------------------------
+		error_page 404 = @fallback; 
+		location @fallback {
+		proxy_pass http://<tmpl_if name='seo_redirect_enabled'><tmpl_var name='seo_redirect_target_domain'><tmpl_else><tmpl_if name='ip_address' op='!=' value="*" ><tmpl_var name='ip_address'><tmpl_else><tmpl_var name='domain'></tmpl_if></tmpl_if>:<tmpl_var name='apache2_port'>;			
+		proxy_set_header Host <tmpl_if name='seo_redirect_enabled'><tmpl_var name='seo_redirect_target_domain'><tmpl_else><tmpl_if name='ip_address' op='!=' value="*" ><tmpl_var name='ip_address'><tmpl_else><tmpl_var name='domain'></tmpl_if></tmpl_if>;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		proxy_set_header X-Real-IP $remote_addr;
+}
+# ------ Log configuration ----------------------------------------------------
+		access_log off;
+		error_log  off;
+		#error_log /var/log/ispconfig/httpd/<tmpl_var name='domain'>/nginx_error.log error;
+		#access_log /var/log/ispconfig/httpd/<tmpl_var name='domain'>/nginx_access.log combined;
 	<tmpl_if name='ssl_enabled'>
-		######################################################################
-		## SSL configuration
-		######################################################################
 
-		#more_set_headers 'Strict-Transport-Security: max-age=15768000';
-		ssl_certificate <tmpl_var name='document_root'>/ssl/<tmpl_var name='ssl_domain'>.nginx.crt;
-		ssl_certificate_key <tmpl_var name='document_root'>/ssl/<tmpl_var name='ssl_domain'>.key;
+#------- SSL configuration ----------------------------------------------------
+		more_set_headers 'Strict-Transport-Security: max-age=15768000';
+		ssl_certificate <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.crt;
+		ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.key;
 	</tmpl_if>
-
 	<tmpl_if name='ssl_enabled'>
-		######################################################################
-		## Pagespeed configuration
-		######################################################################
 
-		#pagespeed on;
-
-		<tmpl_if name='seo_redirect_enabled'>
-			#pagespeed LoadFromFile "https://<tmpl_var name='seo_redirect_target_domain'>" "<tmpl_var name='web_document_root_www'>/";
-		</tmpl_else>
-			#pagespeed LoadFromFile "https://<tmpl_var name='domain'>" "<tmpl_var name='web_document_root_www'>/";
-		</tmpl_if>
-	</tmpl_if>
-
-	######################################################################
-	## Redirects configuration
-	######################################################################
-
+#------- Pagespeed configuration-----------------------------------------------
 	<tmpl_if name='seo_redirect_enabled'>
-		if ($http_host <tmpl_var name='seo_redirect_operator'> "<tmpl_var name='seo_redirect_origin_domain'>") {
-			return 301 $scheme://<tmpl_var name='seo_redirect_target_domain'>$request_uri;
-		}
+		pagespeed LoadFromFile "https://<tmpl_var name='seo_redirect_target_domain'>" "<tmpl_var name='web_document_root_www'>/";
+		</tmpl_else>
+		pagespeed LoadFromFile "https://<tmpl_var name='domain'>" "<tmpl_var name='web_document_root_www'>/";
+	</tmpl_if>
 	</tmpl_if>
 
-	<tmpl_loop name="alias_seo_redirects">
-		if ($http_host <tmpl_var name='alias_seo_redirect_operator'> "<tmpl_var name='alias_seo_redirect_origin_domain'>") {
-			return 301 $scheme://<tmpl_var name='alias_seo_redirect_target_domain'>$request_uri;
+#------- Redirects configuration-----------------------------------------------
+	<tmpl_if name='http_to_https'>
+		# Redirect http -> https
+		return 301 https://$server_name$request_uri;
+	</tmpl_if>
+	<tmpl_if name='seo_redirect_enabled'>
+		# SEO Redirect
+		if ($http_host = "<tmpl_var name='seo_redirect_origin_domain'>") {
+		return 301 $scheme://<tmpl_var name='seo_redirect_target_domain'>$request_uri;
 		}
-	</tmpl_loop>
-
-	<tmpl_loop name="local_redirects">
-		if ($http_host <tmpl_var name='local_redirect_operator'> "<tmpl_var name='local_redirect_origin_domain'>") {
-			rewrite ^<tmpl_var name='local_redirect_exclude'>(.*)$ <tmpl_var name='local_redirect_target'>$2 <tmpl_var name='local_redirect_type'>;
-		}
-	</tmpl_loop>
-
-	<tmpl_loop name="own_redirects">
-		<tmpl_if name='use_rewrite'>
-			<tmpl_if name='exclude_own_hostname'>if ($http_host != "<tmpl_var name='exclude_own_hostname'>") { </tmpl_if>rewrite ^<tmpl_var name='rewrite_exclude'>(.*)$ <tmpl_var name='rewrite_target'>$2 <tmpl_var name='rewrite_type'>;<tmpl_if name='exclude_own_hostname'> }</tmpl_if>
-		</tmpl_if>
-	</tmpl_loop>
-
-	######################################################################
-	## Locations configuration
-	######################################################################
-
-	# global locations
-	include /etc/nginx/locations.d/*.conf;
-
-	<tmpl_if name='errordocs'></tmpl_else>
-		# alias to local error docs
+	</tmpl_if>
+#------ static content --------------------------------------------------------
+	location ~* ^.+\.(jpg|jpeg|gif|png|ico|css|zip|tgz|gz|rar|bz2|doc|xls|exe|pdf|ppt|txt|tar|mid|midi|wav|bmp|rtf|js|swf|flv|mp3)$ {
+		root  <tmpl_var name='web_document_root_www'>;
+		access_log off;
+        	expires 30d; 
+}
+#-------Html ------------------------------------------------------------------
+	location ~* ^.+\.(htm|html)$ { 
+		root <tmpl_var name='web_document_root_www'>; 
+		try_files $uri /index.php ;  
+	        access_log off; 
+		expires 30d;
+}
+#------ Locations configuration -----------------------------------------------
+		# global locations
+		# alias to local error docs<tmpl_var name='domain'> <tmpl_if name='alias'><tmpl_var name='alias'></tmpl_if> <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'></tmpl_if>
+	<tmpl_if name='errordocs'>
 		location ^~ /error { root /var/www; }
 	</tmpl_if>
 
-	# protected /stats direcotry
-	location /stats {
-	    <tmpl_var name='web_document_root_www_proxy'>
-	    index index.html index.php;
-	    auth_basic "Members Only";
-	    auth_basic_user_file <tmpl_var name='stats_auth_passwd_file'>;
-	}
-
-	location ^~ /awstats-icon { alias /usr/share/awstats/icon; }
-
-	<tmpl_loop name="basic_auth_locations">
-		# protected directories
-		location <tmpl_var name='htpasswd_location'> { ##merge##
-			auth_basic "Members Only";
-			auth_basic_user_file <tmpl_var name='htpasswd_path'>.htpasswd;
-
-			location ~ \.php$ {
-				#proxy_cache nginx_cache;
-				proxy_pass http://127.0.0.1:82;
-			}
-		}
-	</tmpl_loop>
-
-	<tmpl_if name='cgi' op='==' value='y'>
-		# CGI
-		location /cgi-bin/ {
-			root <tmpl_var name='document_root'>;
-			#proxy_cache nginx_cache;
-			proxy_pass http://127.0.0.1:82;
-		}
-	</tmpl_if>
-
-	# server side includes (SSI)
-	<tmpl_if name='ssi' op='==' value='y'>
-		location ~ \.shtml$ {
-			ssi on;
-		}
-	</tmpl_if>
-
-	# PHP
-	location ~ \.php$ {
-		#proxy_cache nginx_cache;
-		proxy_pass http://127.0.0.1:82;
-	}
-
 	# default location
 	location / {
-		#limit_req zone=ddos-cage burst=25;
-		try_files $uri $uri/ /index.php?$args @apache;
-	}
-
-	# Apache backend
-	location @apache {
-		#proxy_cache nginx_cache;
-		proxy_pass http://127.0.0.1:82;
-	}
-
-	######################################################################
-	## Directives configuration
-	######################################################################
-
-	<tmpl_loop name="rewrite_rules">
-		<tmpl_var name='rewrite_rule'>
-	</tmpl_loop>
-
-	<tmpl_loop name="nginx_directives">
-		<tmpl_var name='nginx_directive'>
-	</tmpl_loop>
-
+		index index.php index.html index.htm;	
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header Host <tmpl_if name='seo_redirect_enabled'><tmpl_var name='seo_redirect_target_domain'><tmpl_else><tmpl_if name='ip_address' op='!=' value="*" ><tmpl_var name='ip_address'><tmpl_else><tmpl_var name='domain'></tmpl_if></tmpl_if>;
+	        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		proxy_pass http://<tmpl_if name='seo_redirect_enabled'><tmpl_var name='seo_redirect_target_domain'><tmpl_else><tmpl_if name='ip_address' op='!=' value="*" ><tmpl_var name='ip_address'><tmpl_else><tmpl_var name='domain'></tmpl_if></tmpl_if>:<tmpl_var name='apache2_port'>;		
 }
+#------- Directives configuration ---------------------------------------------
+ include /etc/nginx/locations.d/*.conf;
 
-<tmpl_loop name="redirects">
-server {
-
-	######################################################################
-	## Server configuration
-	######################################################################
-
-	listen <tmpl_var name='ip_address'>:80;
-
-	<tmpl_if name='ipv6_enabled'>
-		listen [<tmpl_var name='ipv6_address'>]:80 ipv6only=on;
-	</tmpl_if>
-
-	<tmpl_if name='ssl_enabled'>
-		listen <tmpl_var name='ip_address'>:443 ssl spdy;
-
-		<tmpl_if name='ipv6_enabled'>
-			listen [<tmpl_var name='ipv6_address'>]:443 ipv6only=on ssl spdy;
-		</tmpl_if>
-	</tmpl_if>
-
-	server_name <tmpl_var name='rewrite_domain'>;
-
-	<tmpl_if name='ssl_enabled'>
-		######################################################################
-		## SSL configuration
-		######################################################################
-
-		#more_set_headers 'Strict-Transport-Security: max-age=15768000';
-		ssl_certificate <tmpl_var name='document_root'>/ssl/<tmpl_var name='ssl_domain'>.nginx.crt;
-		ssl_certificate_key <tmpl_var name='document_root'>/ssl/<tmpl_var name='ssl_domain'>.key;
-	</tmpl_if>
-
-	######################################################################
-	## Redirects configuration
-	######################################################################
-
-	<tmpl_if name='alias_seo_redirects2'>
-		<tmpl_loop name="alias_seo_redirects2">
-			if ($http_host <tmpl_var name='alias_seo_redirect_operator'> "<tmpl_var name='alias_seo_redirect_origin_domain'>") {
-	            rewrite ^ $scheme://<tmpl_var name='alias_seo_redirect_target_domain'>$request_uri permanent;
-	        }
-		</tmpl_loop>
-	</tmpl_if>
-
-	<tmpl_if name='use_rewrite'>
-		rewrite ^ <tmpl_var name='rewrite_target'>$request_uri? <tmpl_var name='rewrite_type'>;
-	</tmpl_if>
-
+	<tmpl_var name='nginx_directives'>
 }
 </tmpl_loop>
