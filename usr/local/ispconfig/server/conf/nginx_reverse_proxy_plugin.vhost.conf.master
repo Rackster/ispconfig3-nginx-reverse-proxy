@@ -1,104 +1,104 @@
 <tmpl_loop name='vhosts'>
 server {
 
-	######################################################################
-	## Server configuration
-	######################################################################
+    ######################################################################
+    ## Server configuration
+    ######################################################################
 
-	<tmpl_if name='ssl_enabled'>
-		listen <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'>:</tmpl_if>443 ssl spdy;
-		<tmpl_if name='ipv6_enabled'>
-			listen [<tmpl_var name='ipv6_address'>]:443 ipv6only=on ssl spdy;
-		</tmpl_if>
-	</tmpl_else>
-		listen <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'>:</tmpl_if>80;
-		<tmpl_if name='ipv6_enabled'>
-			listen [<tmpl_var name='ipv6_address'>]:80 ipv6only=on;
-		</tmpl_if>
-	</tmpl_if>
+    <tmpl_if name='ssl_enabled'>
+        listen <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'>:</tmpl_if>443 ssl spdy;
+        <tmpl_if name='ipv6_enabled'>
+            listen [<tmpl_var name='ipv6_address'>]:443 ipv6only=on ssl spdy;
+        </tmpl_if>
+    </tmpl_else>
+        listen <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'>:</tmpl_if>80;
+        <tmpl_if name='ipv6_enabled'>
+            listen [<tmpl_var name='ipv6_address'>]:80 ipv6only=on;
+        </tmpl_if>
+    </tmpl_if>
 
-	server_name <tmpl_var name='domain'> <tmpl_if name='alias'><tmpl_var name='alias'></tmpl_if> <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'></tmpl_if>;
+    server_name <tmpl_var name='domain'> <tmpl_if name='alias'><tmpl_var name='alias'></tmpl_if> <tmpl_if name='ip_address' op='!=' value='*'><tmpl_var name='ip_address'></tmpl_if>;
 
-	root <tmpl_var name='web_document_root_www'>;
+    root <tmpl_var name='web_document_root_www'>;
 
-	######################################################################
-	## Log configuration
-	######################################################################
+    ######################################################################
+    ## Log configuration
+    ######################################################################
 
-	access_log off;
+    access_log off;
 
-	<tmpl_if name='ssl_enabled'>
-		######################################################################
-		## SSL configuration
-		######################################################################
-
-        # recommended but not manditory directive
-        # leave commented out unless you know what it is doing
-		#more_set_headers 'Strict-Transport-Security: max-age=15768000';
-
-		ssl_certificate <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.crt;
-		ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.key;
-	</tmpl_if>
-
-	<tmpl_if name='ssl_enabled'>
-		######################################################################
-		## Pagespeed configuration
-		######################################################################
+    <tmpl_if name='ssl_enabled'>
+        ######################################################################
+        ## SSL configuration
+        ######################################################################
 
         # recommended but not manditory directive
         # leave commented out unless you know what it is doing
-		<tmpl_if name='seo_redirect_enabled'>
-			#pagespeed LoadFromFile "https://<tmpl_var name='seo_redirect_target_domain'>" "<tmpl_var name='web_document_root_www'>/";
-		</tmpl_else>
-			#pagespeed LoadFromFile "https://<tmpl_var name='domain'>" "<tmpl_var name='web_document_root_www'>/";
-		</tmpl_if>
-	</tmpl_if>
+        #more_set_headers 'Strict-Transport-Security: max-age=15768000';
 
-	######################################################################
-	## Redirects configuration
-	######################################################################
+        ssl_certificate <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.crt;
+        ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.key;
+    </tmpl_if>
 
-	<tmpl_if name='http_to_https'>
-		# Redirect http -> https
-		return 301 https://$server_name$request_uri;
-	</tmpl_if>
+    <tmpl_if name='ssl_enabled'>
+        ######################################################################
+        ## Pagespeed configuration
+        ######################################################################
 
-	<tmpl_if name='seo_redirect_enabled'>
-		# SEO Redirect
-		if ($http_host = "<tmpl_var name='seo_redirect_origin_domain'>") {
-			return 301 $scheme://<tmpl_var name='seo_redirect_target_domain'>$request_uri;
-		}
-	</tmpl_if>
+        # recommended but not manditory directive
+        # leave commented out unless you know what it is doing
+        <tmpl_if name='seo_redirect_enabled'>
+            #pagespeed LoadFromFile "https://<tmpl_var name='seo_redirect_target_domain'>" "<tmpl_var name='web_document_root_www'>/";
+        </tmpl_else>
+            #pagespeed LoadFromFile "https://<tmpl_var name='domain'>" "<tmpl_var name='web_document_root_www'>/";
+        </tmpl_if>
+    </tmpl_if>
 
-	######################################################################
-	## Locations configuration
-	######################################################################
+    ######################################################################
+    ## Redirects configuration
+    ######################################################################
 
-	# global locations
+    <tmpl_if name='http_to_https'>
+        # Redirect http -> https
+        return 301 https://$server_name$request_uri;
+    </tmpl_if>
+
+    <tmpl_if name='seo_redirect_enabled'>
+        # SEO Redirect
+        if ($http_host = "<tmpl_var name='seo_redirect_origin_domain'>") {
+            return 301 $scheme://<tmpl_var name='seo_redirect_target_domain'>$request_uri;
+        }
+    </tmpl_if>
+
+    ######################################################################
+    ## Locations configuration
+    ######################################################################
+
+    # global locations
     # recommended but not manditory directive
     # leave commented out unless you know what it is doing
-	# include /etc/nginx/locations.d/*.conf;
+    # include /etc/nginx/locations.d/*.conf;
 
-	# alias to local error docs
-	<tmpl_if name='errordocs'>
-		location ^~ /error { root /var/www; }
-	</tmpl_if>
+    # alias to local error docs
+    <tmpl_if name='errordocs'>
+        location ^~ /error { root /var/www; }
+    </tmpl_if>
 
-	# default location
-	location / {
+    # default location
+    location / {
         # recommended but not manditory directives
         # leave commented out unless you know what they are doing
-		#limit_req zone=ddos-cage burst=25 nodelay;
-		#proxy_cache nginx_cache;
+        #limit_req zone=ddos-cage burst=25 nodelay;
+        #proxy_cache nginx_cache;
 
-		proxy_pass http://127.0.0.1:<tmpl_var name='apache2_port'>;
-	}
+        proxy_pass http://127.0.0.1:<tmpl_var name='apache2_port'>;
+    }
 
-	######################################################################
-	## Directives configuration
-	######################################################################
+    ######################################################################
+    ## Directives configuration
+    ######################################################################
 
-	<tmpl_var name='nginx_directives'>
+    <tmpl_var name='nginx_directives'>
 
 }
 </tmpl_loop>
