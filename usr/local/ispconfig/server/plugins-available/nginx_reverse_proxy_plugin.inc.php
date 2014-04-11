@@ -722,6 +722,7 @@ class nginx_reverse_proxy_plugin {
 			}
 
 			$app->system->copy($data['cert']['key'], $data['cert'][$suffix .'_key']);
+            $app->system->chmod($data['cert'][$suffix .'_key'], 0400);
 			$app->log('Copying ssl key file: '. $data['cert'][$suffix .'_key'], LOGLEVEL_DEBUG);
 		} else {
 			$app->log('Creating '. $suffix .' ssl files failed', LOGLEVEL_DEBUG);
