@@ -660,10 +660,8 @@ class nginx_reverse_proxy_plugin {
 		$ssl_dir = $data['new']['document_root'] .'/ssl';
 
 		$data['cert']['crt'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.crt');
-		$data['cert']['key'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.key');
 		$data['cert']['bundle'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.bundle');
 		$data['cert'][$suffix .'_crt'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.'. $suffix .'.crt');
-		$data['cert'][$suffix .'_key'] = escapeshellcmd($ssl_dir .'/'. $data['new']['ssl_domain'] .'.'. $suffix .'.key');
 
 		if (is_file($data['cert']['crt'])) {
 			$data['cert']['crt_check'] = 1;
@@ -671,14 +669,6 @@ class nginx_reverse_proxy_plugin {
 
 		if (is_file($data['cert'][$suffix .'_crt'])) {
 			$data['cert'][$suffix .'_crt_check'] = 1;
-		}
-
-		if (is_file($data['cert']['key'])) {
-			$data['cert']['key_check'] = 1;
-		}
-
-		if (is_file($data['cert'][$suffix .'_key'])) {
-			$data['cert'][$suffix .'_key_check'] = 1;
 		}
 
 		if (is_file($data['cert']['bundle'])) {
@@ -708,7 +698,7 @@ class nginx_reverse_proxy_plugin {
 
 		$app->uses('system');
 
-		if ($data['cert']['crt_check'] == 1 && $data['cert']['key_check'] == 1)	{
+		if ($data['cert']['crt_check'] == 1)	{
 			if ($data['cert']['bundle_check'] == 1)	{
 				exec('echo "" > /tmp/ispconfig3_newline_fix');
 
@@ -720,9 +710,6 @@ class nginx_reverse_proxy_plugin {
 				$app->system->copy($data['cert']['crt'], $data['cert'][$suffix .'_crt']);
 				$app->log('Copying ssl cert file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
 			}
-
-			$app->system->copy($data['cert']['key'], $data['cert'][$suffix .'_key']);
-			$app->log('Copying ssl key file: '. $data['cert'][$suffix .'_key'], LOGLEVEL_DEBUG);
 		} else {
 			$app->log('Creating '. $suffix .' ssl files failed', LOGLEVEL_DEBUG);
 		}
@@ -760,11 +747,6 @@ class nginx_reverse_proxy_plugin {
 		if ($data['cert'][$suffix .'_crt_check'] == 1) {
 			$app->system->unlink($data['cert']['nginx_crt']);
 			$app->log('Removing ssl cert file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
-		}
-
-		if ($data['cert'][$suffix .'_key_check'] == 1) {
-			$app->system->unlink($data['cert'][$suffix .'_key']);
-			$app->log('Removing ssl key file: '. $data['cert'][$suffix. '_key'], LOGLEVEL_DEBUG);
 		}
 	}
 

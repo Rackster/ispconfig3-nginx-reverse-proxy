@@ -37,7 +37,7 @@ server {
         #more_set_headers 'Strict-Transport-Security: max-age=15768000';
 
         ssl_certificate <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.crt;
-        ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.nginx.key;
+        ssl_certificate_key <tmpl_var name='web_document_root_ssl'>/<tmpl_var name='ssl_domain'>.key;
     </tmpl_if>
 
     <tmpl_if name='ssl_enabled'>
