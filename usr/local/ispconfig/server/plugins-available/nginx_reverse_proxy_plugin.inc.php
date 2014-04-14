@@ -704,12 +704,8 @@ class nginx_reverse_proxy_plugin {
 
 		if ($data['cert']['crt_check'] == 1)	{
 			if ($data['cert']['bundle_check'] == 1)	{
-				exec('echo "" > /tmp/ispconfig3_newline_fix');
-
-				exec('cat '. $data['cert']['crt'] .' /tmp/ispconfig3_newline_fix '. $data['cert']['bundle'] .' > '. $data['cert'][$suffix .'_crt']);
+                exec('(cat '. $data['cert']['crt'] .'; echo ""; cat '. $data['cert']['bundle'] .') > '. $data['cert'][$suffix .'_crt']);
 				$app->log('Merging ssl cert and bundle file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
-
-				$app->system->unlink("/tmp/ispconfig3_newline_fix");
 			} else {
 				$app->system->copy($data['cert']['crt'], $data['cert'][$suffix .'_crt']);
 				$app->log('Copying ssl cert file: '. $data['cert'][$suffix .'_crt'], LOGLEVEL_DEBUG);
