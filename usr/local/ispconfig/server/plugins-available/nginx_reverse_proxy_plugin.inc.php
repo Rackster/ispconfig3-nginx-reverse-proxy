@@ -7,7 +7,7 @@
  * Nginx in front of Apache2 as a transparent reverse proxy.
  *
  * @author Rackster Internet Services <open-source@rackster.ch>
- * @link https://open-source.rackster.ch/project/ispconfig3-nginx-reverse-proxy-plugin
+ * @link   https://open-source.rackster.ch/project/ispconfig3-nginx-reverse-proxy-plugin
  */
 class nginx_reverse_proxy_plugin {
 
@@ -80,7 +80,7 @@ class nginx_reverse_proxy_plugin {
 	 * @uses cert_helper()
 	 *
 	 * @param string $event_name the event/action name
-	 * @param array $data the vhost data
+	 * @param array  $data       the vhost data
 	 */
 	function ssl($event_name, $data) {
 		global $app, $conf;
@@ -107,7 +107,7 @@ class nginx_reverse_proxy_plugin {
 	 * @uses update()
 	 *
 	 * @param string $event_name the event/action name
-	 * @param array $data the vhost data
+	 * @param array  $data       the vhost data
 	 */
 	function insert($event_name, $data)	{
 		global $app, $conf;
@@ -125,7 +125,7 @@ class nginx_reverse_proxy_plugin {
 	 * @see delete()
 	 *
 	 * @param string $event_name the event/action name
-	 * @param array $data the vhost data
+	 * @param array  $data       the vhost data
 	 */
 	function update($event_name, $data)	{
 		global $app, $conf;
@@ -433,7 +433,7 @@ class nginx_reverse_proxy_plugin {
 	 * @uses update()
 	 *
 	 * @param string $event_name the event/action name
-	 * @param array $data the vhost data
+	 * @param array  $data       the vhost data
 	 */
 	function delete($event_name, $data) {
 		global $app, $conf;
@@ -466,7 +466,7 @@ class nginx_reverse_proxy_plugin {
 	 * @uses vhost_helper()
 	 *
 	 * @param string $event_name the event/action name
-	 * @param array $data the vhost data
+	 * @param array  $data       the vhost data
 	 */
 	function client_delete($event_name, $data) {
 		global $app, $conf;
@@ -510,8 +510,9 @@ class nginx_reverse_proxy_plugin {
 	 * This functions helps to create/delete and link/unlink vhost configs on disk.
 	 *
 	 * @param string $action the event/action name
-	 * @param array $data the vhost data
-	 * @param mixed $tpl vhost template to proceed
+	 * @param array  $data   the vhost data
+	 * @param mixed  $tpl    vhost template to proceed
+     *
 	 * @return $data['vhost'] the vhost data
 	 */
 	private function vhost_helper($action, $data, $tpl = '') {
@@ -560,9 +561,10 @@ class nginx_reverse_proxy_plugin {
 	/**
 	 * Creates the vhost file and link.
 	 *
-	 * @param array $data the vhost data
-	 * @param object $app ISPConfig app object
-	 * @param mixed $tpl vhost template to proceed
+	 * @param array  $data the vhost data
+	 * @param object $app  ISPConfig app object
+	 * @param mixed  $tpl  vhost template to proceed
+     *
 	 * @return $data['vhost'] the vhost data
 	 */
 	private function vhost_insert($data, $app, $tpl) {
@@ -591,10 +593,11 @@ class nginx_reverse_proxy_plugin {
 	 * @uses vhost_delete()
 	 * @uses vhost_insert()
 	 *
-	 * @param array $data the vhost data
-	 * @param object $app ISPConfig app object
-	 * @param mixed $tpl vhost template to proceed
-	 * @return
+	 * @param array  $data the vhost data
+	 * @param object $app  ISPConfig app object
+	 * @param mixed  $tpl  vhost template to proceed
+     *
+	 * @return the vhost data
 	 */
 	private function vhost_update($data, $app, $tpl) {
 		global $app;
@@ -618,9 +621,9 @@ class nginx_reverse_proxy_plugin {
 	/**
 	 * Deletes the vhost file and link.
 	 *
-	 * @param array $data the vhost data
-	 * @param object $app ISPConfig app object
-	 * @param mixed $tpl vhost template to proceed
+	 * @param array  $data the vhost data
+	 * @param object $app  ISPConfig app object
+	 * @param mixed  $tpl  vhost template to proceed
 	 */
 	private function vhost_delete($data, $app, $tpl = '') {
 		global $app;
@@ -647,7 +650,8 @@ class nginx_reverse_proxy_plugin {
 	 * This functions helps to create/delete and link/unlink SSL cert files on disk.
 	 *
 	 * @param string $action the event/action name
-	 * @param array $data the vhost data
+	 * @param array  $data   the vhost data
+     *
 	 * @return $data['cert'] the cert data
 	 */
 	private function cert_helper($action, $data) {
@@ -689,8 +693,8 @@ class nginx_reverse_proxy_plugin {
 	/**
 	 * Creates the ssl cert files.
 	 *
-	 * @param array $data the vhost data
-	 * @param object $app ISPConfig app object
+	 * @param array  $data   the vhost data
+	 * @param object $app    ISPConfig app object
 	 * @param string $suffix cert filename suffix
 	 */
 	private function cert_insert($data, $app, $suffix) {
@@ -721,8 +725,8 @@ class nginx_reverse_proxy_plugin {
 	 * @uses cert_delete()
 	 * @uses cert_insert()
 	 *
-	 * @param array $data the vhost data
-	 * @param object $app ISPConfig app object
+	 * @param array  $data   the vhost data
+	 * @param object $app    ISPConfig app object
 	 * @param string $suffix cert filename suffix
 	 */
 	private function cert_update($data, $app, $suffix) {
@@ -735,8 +739,8 @@ class nginx_reverse_proxy_plugin {
 	/**
 	 * Removes the ssl cert files.
 	 *
-	 * @param array $data the vhost data
-	 * @param object $app ISPConfig app object
+	 * @param array  $data   the vhost data
+	 * @param object $app    ISPConfig app object
 	 * @param string $suffix cert filename suffix
 	 */
 	private function cert_delete($data, $app, $suffix) {
