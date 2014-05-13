@@ -1,7 +1,11 @@
 <Directory {tmpl_var name='web_basedir'}/{tmpl_var name='domain'}>
 	AllowOverride None
-	Order Deny,Allow
-	Deny from all
+	<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+        Require all denied
+    <tmpl_else>
+        Order Deny,Allow
+        Deny from all
+    </tmpl_if>
 </Directory>
 
 <tmpl_loop name="vhosts">
@@ -47,10 +51,14 @@
 			# Custom error pages
 			Alias /error/ /var/www/error/
 			<Directory /var/www/error/>
-				Options FollowSymLinks
+				Options +FollowSymLinks
 				AllowOverride None
-				Order allow,deny
-				allow from all
+				<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                    Require all granted
+                <tmpl_else>
+                    Order allow,deny
+                    Allow from all
+                </tmpl_if>
 			</Directory>
 
 			ErrorDocument 400 /error/400.html
@@ -78,18 +86,26 @@
 
 			<tmpl_if name='php' op='==' value='no'>
 				<Files ~ '.php[s3-6]{0,1}$'>
-					Order allow,deny
-					Deny from all
-					Allow from none
+					<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                        Require all denied
+                    <tmpl_else>
+                        Order allow,deny
+                        Deny from all
+                        Allow from none
+                    </tmpl_if>
 				</Files>
 			</tmpl_if>
 		</Directory>
 
 		<Directory {tmpl_var name='web_document_root'}>
-			Options FollowSymLinks
+			Options +FollowSymLinks
 			AllowOverride <tmpl_var name='allow_override'>
-			Order allow,deny
-			Allow from all
+			<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                Require all granted
+            <tmpl_else>
+                Order allow,deny
+                Allow from all
+            </tmpl_if>
 
 			<tmpl_if name='ssi' op='==' value='y'>
 				# ssi enabled
@@ -100,9 +116,13 @@
 
 			<tmpl_if name='php' op='==' value='no'>
 				<Files ~ '.php[s3-6]{0,1}$'>
-					Order allow,deny
-					Deny from all
-					Allow from none
+					<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                        Require all denied
+                    <tmpl_else>
+                        Order allow,deny
+                        Deny from all
+                        Allow from none
+                    </tmpl_if>
 				</Files>
 			</tmpl_if>
 		</Directory>
@@ -136,6 +156,11 @@
 					PerlOptions +ParseHeaders
 					Options +ExecCGI
 				</Directory>
+                <Directory {tmpl_var name='web_document_root'}>
+                    PerlResponseHandler ModPerl::Registry
+                    PerlOptions +ParseHeaders
+                    Options +ExecCGI
+                </Directory>
             	<Files *.pl>
 					SetHandler perl-script
             	</Files>
@@ -145,7 +170,9 @@
 		<tmpl_if name='python' op='==' value='y'>
 			<IfModule mod_python.c>
 				<Directory {tmpl_var name='web_document_root_www'}>
-					AddHandler mod_python .py
+					<FilesMatch "\.py$">
+                        SetHandler mod_python
+                    </FilesMatch>
 					PythonHandler mod_python.publisher
 					PythonDebug On
 				</Directory>
@@ -155,13 +182,18 @@
 		<tmpl_if name='cgi' op='==' value='y'>
 			# cgi enabled
 			<Directory {tmpl_var name='document_root'}/cgi-bin>
-				Order allow,deny
-				Allow from all
+				<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                    Require all granted
+                <tmpl_else>
+                    Order allow,deny
+                    Allow from all
+                </tmpl_if>
 			</Directory>
 
 			ScriptAlias  /cgi-bin/ <tmpl_var name='document_root'>/cgi-bin/
-			AddHandler cgi-script .cgi
-			AddHandler cgi-script .pl
+			<FilesMatch "\.(cgi|pl)$">
+                SetHandler cgi-script
+            </FilesMatch>
 		</tmpl_if>
 
 		<tmpl_if name='suexec' op='==' value='y'>
@@ -172,7 +204,7 @@
 		</tmpl_if>
 
 		# Clear PHP settings of this website
-		<FilesMatch "\.ph(p3?|tml)$">
+		<FilesMatch ".+\.ph(p[345]?|t|tml)$">
 			SetHandler None
 		</FilesMatch>
 
@@ -200,7 +232,9 @@
 						suPHP_ConfigPath <tmpl_var name='custom_php_ini_dir'>
 					</tmpl_if>
 
-					AddHandler x-httpd-suphp .php .php3 .php4 .php5
+					<FilesMatch "\.php[345]?$">
+                        SetHandler x-httpd-suphp
+                    </FilesMatch>
 					suPHP_AddHandler x-httpd-suphp
 				</IfModule>
 			</Directory>
@@ -210,10 +244,16 @@
 			# php as cgi enabled
 			ScriptAlias /php5-cgi <tmpl_var name='cgi_starter_path'><tmpl_var name='cgi_starter_script'>
 			Action php5-cgi /php5-cgi
-			AddHandler php5-cgi .php .php3 .php4 .php5
+			<FilesMatch "\.php[345]?$">
+                SetHandler php5-cgi
+            </FilesMatch>
 			<Directory {tmpl_var name='cgi_starter_path'}>
-				Order allow,deny
-				Allow from all
+				<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                    Require all granted
+                <tmpl_else>
+                    Order allow,deny
+                    Allow from all
+                </tmpl_if>
 			</Directory>
 		</tmpl_if>
 
@@ -227,10 +267,10 @@
 					FcgidProcessLifeTime 3600
 					# FcgidMaxProcesses 1000
 					FcgidMinProcessesPerClass 0
-					FcgidMaxProcessesPerClass 100
+					FcgidMaxProcessesPerClass 10
 					FcgidConnectTimeout 3
-					FcgidIOTimeout 360
-					FcgidBusyTimeout 300
+					FcgidIOTimeout 600
+					FcgidBusyTimeout 3600
 					FcgidMaxRequestLen 1073741824
 				<tmpl_else>
 					IdleTimeout 300
@@ -240,36 +280,60 @@
 					DefaultMaxClassProcessCount 100
 					IPCConnectTimeout 3
 					IPCCommTimeout 360
-					BusyTimeout 300
+					BusyTimeout 3600
 				</tmpl_if>
 			</IfModule>
 
 			<Directory {tmpl_var name='web_document_root_www'}>
-				AddHandler fcgid-script .php .php3 .php4 .php5
+				<FilesMatch "\.php[345]?$">
+                    SetHandler fcgid-script
+                </FilesMatch>
 				FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php
+                FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php3
+                FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php4
+                FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php5
 				Options +ExecCGI
 				AllowOverride <tmpl_var name='allow_override'>
-				Order allow,deny
-				Allow from all
+				<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                    Require all granted
+                <tmpl_else>
+                    Order allow,deny
+                    Allow from all
+                </tmpl_if>
 			</Directory>
 
 			<Directory {tmpl_var name='web_document_root'}>
-				AddHandler fcgid-script .php .php3 .php4 .php5
+				<FilesMatch "\.php[345]?$">
+                    SetHandler fcgid-script
+                </FilesMatch>
 				FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php
+                FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php3
+                FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php4
+                FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php5
 				Options +ExecCGI
 				AllowOverride <tmpl_var name='allow_override'>
-				Order allow,deny
-				Allow from all
+				<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                    Require all granted
+                <tmpl_else>
+                    Order allow,deny
+                    Allow from all
+                </tmpl_if>
 			</Directory>
 		</tmpl_if>
 
 		<tmpl_if name='php' op='==' value='php-fpm'>
 			<IfModule mod_fastcgi.c>
 				<Directory {tmpl_var name='document_root'}/cgi-bin>
-					Order allow,deny
-					Allow from all
+					<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                        Require all granted
+                    <tmpl_else>
+                        Order allow,deny
+                        Allow from all
+                    </tmpl_if>
 			    </Directory>
-                AddHandler php5-fcgi .php
+                <FilesMatch "\.php[345]?$">
+                    SetHandler php5-fcgi
+                </FilesMatch>
                 Action php5-fcgi /php5-fcgi
 				Alias /php5-fcgi {tmpl_var name='document_root'}/cgi-bin/php5-fcgi-{tmpl_var name='ip_address'}-{tmpl_var name='port'}-{tmpl_var name='domain'}
 				<tmpl_if name='use_tcp'>
@@ -295,6 +359,7 @@
 				RewriteCond %{HTTP_HOST}   <tmpl_var name='rewrite_domain'>$ [NC]
 				<tmpl_if name="rewrite_is_url" op="==" value="n">
 					RewriteCond %{REQUEST_URI} !^/webdav/
+                    RewriteCond %{REQUEST_URI} !^/php5-fcgi/
 					RewriteCond %{REQUEST_URI} !^<tmpl_var name='rewrite_target'>
 				</tmpl_if>
 				RewriteRule   ^/(.*)$ <tmpl_var name='rewrite_target'><tmpl_if name="rewrite_add_path" op="==" value="y">$1</tmpl_if>  <tmpl_var name='rewrite_type'>
