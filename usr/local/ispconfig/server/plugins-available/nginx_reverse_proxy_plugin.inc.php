@@ -325,8 +325,7 @@ class nginx_reverse_proxy_plugin {
 					'http_to_https' => $http_to_https,
 					'nginx_directives' => $nginx_directives,
 					'errordocs' => $errordocs,
-					'port' => 80,
-					'apache2_port' => 82
+					'port' => 80
 				);
 			} else {
 				$vhosts[] = array(
@@ -336,8 +335,7 @@ class nginx_reverse_proxy_plugin {
 					'http_to_https' => $http_to_https,
 					'nginx_directives' => $nginx_directives,
 					'errordocs' => $errordocs,
-					'port' => 80,
-					'apache2_port' => 82
+					'port' => 80
 				);
 			}
 
@@ -354,8 +352,7 @@ class nginx_reverse_proxy_plugin {
 						'rewrite_enabled' => 1,
 						'nginx_directives' => $nginx_directives,
 						'errordocs' => $errordocs,
-						'port' => 443,
-						'apache2_port' => 82
+						'port' => 443
 					);
 				} else {
 					$vhosts[] = array(
@@ -366,8 +363,7 @@ class nginx_reverse_proxy_plugin {
 						'rewrite_enabled' => 0,
 						'nginx_directives' => $nginx_directives,
 						'errordocs' => $errordocs,
-						'port' => 443,
-						'apache2_port' => 82
+						'port' => 443
 					);
 				}
 			}

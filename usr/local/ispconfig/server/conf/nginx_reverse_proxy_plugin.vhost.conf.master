@@ -73,7 +73,7 @@ server {
 
     # default location
     location / {
-        proxy_pass http://[::1]:<tmpl_var name='apache2_port'>;
+        proxy_pass http://apache2;
     }
 
     ######################################################################
