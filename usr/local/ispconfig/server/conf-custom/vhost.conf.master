@@ -13,13 +13,13 @@
     	<VirtualHost *:82>
     		<tmpl_if name='php' op='==' value='suphp'>
     			DocumentRoot <tmpl_var name='web_document_root'>
-    		</tmpl_else>
+    		<tmpl_else>
     			<tmpl_if name='php' op='==' value='cgi'>
     				DocumentRoot <tmpl_var name='web_document_root'>
-    			</tmpl_else>
+    			<tmpl_else>
     				<tmpl_if name='php' op='==' value='php-fpm'>
     					DocumentRoot <tmpl_var name='web_document_root'>
-    				</tmpl_else>
+    				<tmpl_else>
     					DocumentRoot <tmpl_var name='web_document_root_www'>
     				</tmpl_if>
     			</tmpl_if>
@@ -31,7 +31,7 @@
     		</tmpl_if>
 
     		<tmpl_if name='ip_address' op='!=' value='*'>
-    		ServerAlias <tmpl_var name='ip_address'>
+    		  ServerAlias <tmpl_var name='ip_address'>
     		</tmpl_if>
 
     		ServerAdmin admin@rackster-server.ch
@@ -262,7 +262,6 @@
     			# php as fast-cgi enabled
     			# For config options see: http://httpd.apache.org/mod_fcgid/mod/mod_fcgid.html
     			<IfModule mod_fcgid.c>
-
     				<tmpl_if name='fastcgi_config_syntax' op='==' value='2'>
     					FcgidIdleTimeout 300
     					FcgidProcessLifeTime 3600
