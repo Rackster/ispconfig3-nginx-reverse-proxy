@@ -606,9 +606,7 @@ class nginx_reverse_proxy_plugin {
 			$data['vhost']['link_new_check'] = 1;
 		}
 
-		$app->system->rename($data['vhost']['file_new'], $data['vhost']['file_new'].'~');
 		$data['vhost']['file_new_check'] = 0;
-		$data['vhost']['file_old_check'] = 0;
 
 		$this->vhost_delete($data, $app);
 		return $this->vhost_insert($data, $app, $tpl);
