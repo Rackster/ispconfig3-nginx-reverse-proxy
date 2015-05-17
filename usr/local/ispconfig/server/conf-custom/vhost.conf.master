@@ -52,7 +52,7 @@
     			# Custom error pages
     			Alias /error/ /var/www/error/
     			<Directory /var/www/error/>
-    				Options +FollowSymLinks
+    				Options -Indexes +FollowSymLinks
     				AllowOverride None
     				<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
                         Require all granted
@@ -77,7 +77,7 @@
                 <FilesMatch ".+\.ph(p[345]?|t|tml)$">
                     SetHandler None
                 </FilesMatch>
-    			Options FollowSymLinks
+    			Options -Indexes +FollowSymLinks
     			AllowOverride <tmpl_var name='allow_override'>
     			Order allow,deny
     			Allow from all
@@ -107,7 +107,7 @@
                 <FilesMatch ".+\.ph(p[345]?|t|tml)$">
                     SetHandler None
                 </FilesMatch>
-    			Options +FollowSymLinks
+    			Options -Indexes +FollowSymLinks
     			AllowOverride <tmpl_var name='allow_override'>
     			<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
                     Require all granted
