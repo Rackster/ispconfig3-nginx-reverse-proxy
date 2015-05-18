@@ -1,6 +1,6 @@
 <Directory {tmpl_var name='web_basedir'}/{tmpl_var name='domain'}>
-	AllowOverride None
-	<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+    AllowOverride None
+    <tmpl_if name='apache_version' op='>' value='2.2' format='version'>
         Require all denied
     <tmpl_else>
         Order Deny,Allow
@@ -10,245 +10,272 @@
 
 <tmpl_loop name="vhosts">
     <tmpl_if name='port' op='==' value='80'>
-    	<VirtualHost *:82>
-    		<tmpl_if name='php' op='==' value='suphp'>
-    			DocumentRoot <tmpl_var name='web_document_root'>
-    		<tmpl_else>
-    			<tmpl_if name='php' op='==' value='cgi'>
-    				DocumentRoot <tmpl_var name='web_document_root'>
-    			<tmpl_else>
-    				<tmpl_if name='php' op='==' value='php-fpm'>
-    					DocumentRoot <tmpl_var name='web_document_root'>
-    				<tmpl_else>
-    					DocumentRoot <tmpl_var name='web_document_root_www'>
-    				</tmpl_if>
-    			</tmpl_if>
-    		</tmpl_if>
+        <VirtualHost *:82>
 
-    		ServerName <tmpl_var name='domain'>
-    		<tmpl_if name='alias'>
-    			<tmpl_var name='alias'>
-    		</tmpl_if>
+            # Common
+            ServerAdmin admin@rackster-server.ch
+            ServerName <tmpl_var name='domain'>
+            <tmpl_if name='alias'>
+                <tmpl_var name='alias'>
+            </tmpl_if>
+            <tmpl_if name='ip_address' op='!=' value='*'>
+                ServerAlias <tmpl_var name='ip_address'>
+            </tmpl_if>
 
-    		<tmpl_if name='ip_address' op='!=' value='*'>
-    		  ServerAlias <tmpl_var name='ip_address'>
-    		</tmpl_if>
+            # Logging
+            ErrorLog /var/log/ispconfig/httpd/<tmpl_var name='domain'>/error.log
 
-    		ServerAdmin admin@rackster-server.ch
+            # Document root
+            <tmpl_if name='php' op='==' value='suphp'>
+                DocumentRoot <tmpl_var name='web_document_root'>
+            <tmpl_else>
+                <tmpl_if name='php' op='==' value='cgi'>
+                    DocumentRoot <tmpl_var name='web_document_root'>
+                <tmpl_else>
+                    <tmpl_if name='php' op='==' value='php-fpm'>
+                        DocumentRoot <tmpl_var name='web_document_root'>
+                    <tmpl_else>
+                        DocumentRoot <tmpl_var name='web_document_root_www'>
+                    </tmpl_if>
+                </tmpl_if>
+            </tmpl_if>
 
-    		ErrorLog /var/log/ispconfig/httpd/<tmpl_var name='domain'>/error.log
+            # Rewrites
+            <tmpl_if name="rewrite_enabled">
+                RewriteEngine on
+                <tmpl_if name='seo_redirect_enabled'>
+                    RewriteCond %{HTTP_HOST} <tmpl_var name='seo_redirect_operator'>^<tmpl_var name='seo_redirect_origin_domain'>$ [NC]
+                    RewriteRule ^(.*)$ http<tmpl_if name='ssl_enabled'>s</tmpl_if>://<tmpl_var name='seo_redirect_target_domain'>$1 [R=301,L]
+                </tmpl_if>
+                <tmpl_loop name="alias_seo_redirects">
+                    RewriteCond %{HTTP_HOST} <tmpl_var name='alias_seo_redirect_operator'>^<tmpl_var name='alias_seo_redirect_origin_domain'>$ [NC]
+                    RewriteRule ^(.*)$ http<tmpl_if name='ssl_enabled'>s</tmpl_if>://<tmpl_var name='alias_seo_redirect_target_domain'>$1 [R=301,L]
+                </tmpl_loop>
+                <tmpl_loop name="redirects">
+                    RewriteCond %{HTTP_HOST}   <tmpl_var name='rewrite_domain'>$ [NC]
+                    <tmpl_if name="rewrite_is_url" op="==" value="n">
+                        RewriteCond %{REQUEST_URI} !^/webdav/
+                        RewriteCond %{REQUEST_URI} !^/php5-fcgi/
+                        RewriteCond %{REQUEST_URI} !^<tmpl_var name='rewrite_target'>
+                    </tmpl_if>
+                    RewriteRule   ^/(.*)$ <tmpl_var name='rewrite_target'><tmpl_if name="rewrite_add_path" op="==" value="y">$1</tmpl_if>  <tmpl_var name='rewrite_type'>
+                </tmpl_loop>
+            </tmpl_if>
 
-    		<tmpl_if name='errordocs'>
-    			Alias /error/ <tmpl_var name='web_document_root_www'>/error/
-    			ErrorDocument 400 /error/400.html
-    			ErrorDocument 401 /error/401.html
-    			ErrorDocument 403 /error/403.html
-    			ErrorDocument 404 /error/404.html
-    			ErrorDocument 405 /error/405.html
-    			ErrorDocument 500 /error/500.html
-    			ErrorDocument 502 /error/502.html
-    			ErrorDocument 503 /error/503.html
-    		<tmpl_else>
-    			# Custom error pages
-    			Alias /error/ /var/www/error/
-    			<Directory /var/www/error/>
-    				Options -Indexes +FollowSymLinks
-    				AllowOverride None
-    				<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+            # Error pages
+            <tmpl_if name='errordocs'>
+                Alias /error/ "<tmpl_var name='web_document_root_www'>/error/"
+            <tmpl_else>
+                Alias /error/ /var/www/error/
+                <Directory /var/www/error/>
+                    Options -Indexes +FollowSymLinks
+                    AllowOverride None
+                    <tmpl_if name='apache_version' op='>' value='2.2' format='version'>
                         Require all granted
                     <tmpl_else>
                         Order allow,deny
                         Allow from all
                     </tmpl_if>
-    			</Directory>
+                </Directory>
+            </tmpl_if>
+            ErrorDocument 400 /error/400.html
+            ErrorDocument 401 /error/401.html
+            ErrorDocument 403 /error/403.html
+            ErrorDocument 404 /error/404.html
+            ErrorDocument 405 /error/405.html
+            ErrorDocument 500 /error/500.html
+            ErrorDocument 502 /error/502.html
+            ErrorDocument 503 /error/503.html
 
-    			ErrorDocument 400 /error/400.html
-    			ErrorDocument 401 /error/401.html
-    			ErrorDocument 403 /error/403.html
-    			ErrorDocument 404 /error/404.html
-    			ErrorDocument 405 /error/405.html
-    			ErrorDocument 500 /error/500.html
-    			ErrorDocument 502 /error/502.html
-    			ErrorDocument 503 /error/503.html
-    		</tmpl_if>
-
-    		<Directory {tmpl_var name='web_document_root_www'}>
+            <Directory {tmpl_var name='web_document_root_www'}>
                 # Clear PHP settings of this website
                 <FilesMatch ".+\.ph(p[345]?|t|tml)$">
                     SetHandler None
                 </FilesMatch>
-    			Options -Indexes +FollowSymLinks
-    			AllowOverride <tmpl_var name='allow_override'>
-    			Order allow,deny
-    			Allow from all
+                Options -Indexes +FollowSymLinks
+                AllowOverride <tmpl_var name='allow_override'>
+                <tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                    Require all granted
+                    <tmpl_else>
+                    Order allow,deny
+                    Allow from all
+                </tmpl_if>
 
-    			<tmpl_if name='ssi' op='==' value='y'>
-    				# ssi enabled
-    				AddType text/html .shtml
-    				AddOutputFilter INCLUDES .shtml
-    				Options +Includes
-    			</tmpl_if>
+                <tmpl_if name='ssi' op='==' value='y'>
+                    # ssi enabled
+                    AddType text/html .shtml
+                    AddOutputFilter INCLUDES .shtml
+                    Options +Includes
+                </tmpl_if>
 
-    			<tmpl_if name='php' op='==' value='no'>
-    				<Files ~ '.php[s3-6]{0,1}$'>
-    					<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                <tmpl_if name='php' op='==' value='no'>
+                    <Files ~ '.php[s3-6]{0,1}$'>
+                        <tmpl_if name='apache_version' op='>' value='2.2' format='version'>
                             Require all denied
                         <tmpl_else>
                             Order allow,deny
                             Deny from all
                             Allow from none
                         </tmpl_if>
-    				</Files>
-    			</tmpl_if>
-    		</Directory>
+                    </Files>
+                </tmpl_if>
+            </Directory>
 
-    		<Directory {tmpl_var name='web_document_root'}>
+            <Directory {tmpl_var name='web_document_root'}>
                 # Clear PHP settings of this website
                 <FilesMatch ".+\.ph(p[345]?|t|tml)$">
                     SetHandler None
                 </FilesMatch>
-    			Options -Indexes +FollowSymLinks
-    			AllowOverride <tmpl_var name='allow_override'>
-    			<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                Options -Indexes +FollowSymLinks
+                AllowOverride <tmpl_var name='allow_override'>
+                <tmpl_if name='apache_version' op='>' value='2.2' format='version'>
                     Require all granted
                 <tmpl_else>
                     Order allow,deny
                     Allow from all
                 </tmpl_if>
 
-    			<tmpl_if name='ssi' op='==' value='y'>
-    				# ssi enabled
-    				AddType text/html .shtml
-    				AddOutputFilter INCLUDES .shtml
-    				Options +Includes
-    			</tmpl_if>
+                <tmpl_if name='ssi' op='==' value='y'>
+                    # ssi enabled
+                    AddType text/html .shtml
+                    AddOutputFilter INCLUDES .shtml
+                    Options +Includes
+                </tmpl_if>
 
-    			<tmpl_if name='php' op='==' value='no'>
-    				<Files ~ '.php[s3-6]{0,1}$'>
-    					<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                <tmpl_if name='php' op='==' value='no'>
+                    <Files ~ '.php[s3-6]{0,1}$'>
+                        <tmpl_if name='apache_version' op='>' value='2.2' format='version'>
                             Require all denied
                         <tmpl_else>
                             Order allow,deny
                             Deny from all
                             Allow from none
                         </tmpl_if>
-    				</Files>
-    			</tmpl_if>
-    		</Directory>
+                    </Files>
+                </tmpl_if>
+            </Directory>
 
-    		<tmpl_if name='ruby' op='==' value='y'>
-    			<IfModule mod_ruby.c>
-    				<Directory {tmpl_var name='web_document_root_www'}>
-    					Options +ExecCGI
-    				</Directory>
-    				RubyRequire apache/ruby-run
-    				#RubySafeLevel 0
-    				AddType text/html .rb
-    				AddType text/html .rbx
-    				<Files *.rb>
-    					SetHandler ruby-object
-    					RubyHandler Apache::RubyRun.instance
-    				</Files>
-    				<Files *.rbx>
-    					SetHandler ruby-object
-    					RubyHandler Apache::RubyRun.instance
-    				</Files>
-    			</IfModule>
-    		</tmpl_if>
+            # Ruby
+            <tmpl_if name='ruby' op='==' value='y'>
+                <IfModule mod_ruby.c>
+                    <Directory {tmpl_var name='web_document_root_www'}>
+                        Options +ExecCGI
+                    </Directory>
+                    RubyRequire apache/ruby-run
+                    #RubySafeLevel 0
+                    AddType text/html .rb
+                    AddType text/html .rbx
+                    <Files *.rb>
+                        SetHandler ruby-object
+                        RubyHandler Apache::RubyRun.instance
+                    </Files>
+                    <Files *.rbx>
+                        SetHandler ruby-object
+                        RubyHandler Apache::RubyRun.instance
+                    </Files>
+                </IfModule>
+            </tmpl_if>
 
-    		<tmpl_if name='perl' op='==' value='y'>
-    			<IfModule mod_perl.c>
-    				PerlModule ModPerl::Registry
-    				PerlModule Apache2::Reload
-    				<Directory {tmpl_var name='web_document_root_www'}>
-    					PerlResponseHandler ModPerl::Registry
-    					PerlOptions +ParseHeaders
-    					Options +ExecCGI
-    				</Directory>
+            # Perl
+            <tmpl_if name='perl' op='==' value='y'>
+                <IfModule mod_perl.c>
+                    PerlModule ModPerl::Registry
+                    PerlModule Apache2::Reload
+                    <Directory {tmpl_var name='web_document_root_www'}>
+                        PerlResponseHandler ModPerl::Registry
+                        PerlOptions +ParseHeaders
+                        Options +ExecCGI
+                    </Directory>
                     <Directory {tmpl_var name='web_document_root'}>
                         PerlResponseHandler ModPerl::Registry
                         PerlOptions +ParseHeaders
                         Options +ExecCGI
                     </Directory>
-                	<Files *.pl>
-    					SetHandler perl-script
-                	</Files>
-    			</IfModule>
-    		</tmpl_if>
+                    <Files *.pl>
+                        SetHandler perl-script
+                    </Files>
+                </IfModule>
+            </tmpl_if>
 
-    		<tmpl_if name='python' op='==' value='y'>
-    			<IfModule mod_python.c>
-    				<Directory {tmpl_var name='web_document_root_www'}>
-    					<FilesMatch "\.py$">
+            # Python
+            <tmpl_if name='python' op='==' value='y'>
+                <IfModule mod_python.c>
+                    <Directory {tmpl_var name='web_document_root_www'}>
+                        <FilesMatch "\.py$">
                             SetHandler mod_python
                         </FilesMatch>
-    					PythonHandler mod_python.publisher
-    					PythonDebug On
-    				</Directory>
-    			</IfModule>
-    		</tmpl_if>
+                        PythonHandler mod_python.publisher
+                        PythonDebug On
+                    </Directory>
+                </IfModule>
+            </tmpl_if>
 
-    		<tmpl_if name='cgi' op='==' value='y'>
-    			# cgi enabled
-    			<Directory {tmpl_var name='document_root'}/cgi-bin>
-    				<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+            # CGI
+            <tmpl_if name='cgi' op='==' value='y'>
+                # cgi enabled
+                <Directory {tmpl_var name='document_root'}/cgi-bin>
+                    <tmpl_if name='apache_version' op='>' value='2.2' format='version'>
                         Require all granted
                     <tmpl_else>
                         Order allow,deny
                         Allow from all
                     </tmpl_if>
-    			</Directory>
+                </Directory>
 
-    			ScriptAlias  /cgi-bin/ <tmpl_var name='document_root'>/cgi-bin/
-    			<FilesMatch "\.(cgi|pl)$">
+                ScriptAlias  /cgi-bin/ <tmpl_var name='document_root'>/cgi-bin/
+                <FilesMatch "\.(cgi|pl)$">
                     SetHandler cgi-script
                 </FilesMatch>
-    		</tmpl_if>
+            </tmpl_if>
 
-    		<tmpl_if name='suexec' op='==' value='y'>
-    			# suexec enabled
-    			<IfModule mod_suexec.c>
-    				SuexecUserGroup <tmpl_var name='system_user'> <tmpl_var name='system_group'>
-    			</IfModule>
-    		</tmpl_if>
+            # SuExec
+            <tmpl_if name='suexec' op='==' value='y'>
+                # suexec enabled
+                <IfModule mod_suexec.c>
+                    SuexecUserGroup <tmpl_var name='system_user'> <tmpl_var name='system_group'>
+                </IfModule>
+            </tmpl_if>
 
-    		<tmpl_if name='php' op='==' value='mod'>
-    			# mod_php enabled
-    			AddType application/x-httpd-php .php .php3 .php4 .php5
-    			php_admin_value sendmail_path "/usr/sbin/sendmail -t -i -fwebmaster@<tmpl_var name='domain'>"
-    			php_admin_value upload_tmp_dir <tmpl_var name='document_root'>/tmp
-    			php_admin_value session.save_path <tmpl_var name='document_root'>/tmp
-    			# PHPIniDir <tmpl_var name='custom_php_ini_dir'>
+            # mod_php
+            <tmpl_if name='php' op='==' value='mod'>
+                # mod_php enabled
+                AddType application/x-httpd-php .php .php3 .php4 .php5
+                php_admin_value sendmail_path "/usr/sbin/sendmail -t -i -fwebmaster@<tmpl_var name='domain'>"
+                php_admin_value upload_tmp_dir <tmpl_var name='document_root'>/tmp
+                php_admin_value session.save_path <tmpl_var name='document_root'>/tmp
+                # PHPIniDir <tmpl_var name='custom_php_ini_dir'>
 
-    			<tmpl_if name='security_level' op='==' value='20'>
-    				php_admin_value open_basedir <tmpl_var name='php_open_basedir'>
-    			</tmpl_if>
-    		</tmpl_if>
+                <tmpl_if name='security_level' op='==' value='20'>
+                    php_admin_value open_basedir <tmpl_var name='php_open_basedir'>
+                </tmpl_if>
+            </tmpl_if>
 
-    		<tmpl_if name='php' op='==' value='suphp'>
-    			# suphp enabled
-    			<Directory {tmpl_var name='web_document_root'}>
-    				<IfModule mod_suphp.c>
-    					suPHP_Engine on
-    					# suPHP_UserGroup <tmpl_var name='system_user'> <tmpl_var name='system_group'>
+            # suPHP
+            <tmpl_if name='php' op='==' value='suphp'>
+                # suphp enabled
+                <Directory {tmpl_var name='web_document_root'}>
+                    <IfModule mod_suphp.c>
+                        suPHP_Engine on
+                        # suPHP_UserGroup <tmpl_var name='system_user'> <tmpl_var name='system_group'>
 
-    					<tmpl_if name='has_custom_php_ini'>
-    						suPHP_ConfigPath <tmpl_var name='custom_php_ini_dir'>
-    					</tmpl_if>
+                        <tmpl_if name='has_custom_php_ini'>
+                            suPHP_ConfigPath <tmpl_var name='custom_php_ini_dir'>
+                        </tmpl_if>
 
-    					<FilesMatch "\.php[345]?$">
+                        <FilesMatch "\.php[345]?$">
                             SetHandler x-httpd-suphp
                         </FilesMatch>
-    					suPHP_AddHandler x-httpd-suphp
-    				</IfModule>
-    			</Directory>
-    		</tmpl_if>
+                        suPHP_AddHandler x-httpd-suphp
+                    </IfModule>
+                </Directory>
+            </tmpl_if>
 
-    		<tmpl_if name='php' op='==' value='cgi'>
-    			# php as cgi enabled
-    			ScriptAlias /php5-cgi <tmpl_var name='cgi_starter_path'><tmpl_var name='cgi_starter_script'>
-    			Action php5-cgi /php5-cgi
-    			<Directory {tmpl_var name='web_document_root_www'}>
+            # PHP CGI
+            <tmpl_if name='php' op='==' value='cgi'>
+                # php as cgi enabled
+                ScriptAlias /php5-cgi <tmpl_var name='cgi_starter_path'><tmpl_var name='cgi_starter_script'>
+                Action php5-cgi /php5-cgi
+                <Directory {tmpl_var name='web_document_root_www'}>
                     <FilesMatch "\.php[345]?$">
                         SetHandler php5-cgi
                     </FilesMatch>
@@ -258,89 +285,92 @@
                         SetHandler php5-cgi
                     </FilesMatch>
                 </Directory>
-    			<Directory {tmpl_var name='cgi_starter_path'}>
-    				<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                <Directory {tmpl_var name='cgi_starter_path'}>
+                    <tmpl_if name='apache_version' op='>' value='2.2' format='version'>
                         Require all granted
                     <tmpl_else>
                         Order allow,deny
                         Allow from all
                     </tmpl_if>
-    			</Directory>
-    		</tmpl_if>
+                </Directory>
+            </tmpl_if>
 
-    		<tmpl_if name='php' op='==' value='fast-cgi'>
-    			# php as fast-cgi enabled
-    			# For config options see: http://httpd.apache.org/mod_fcgid/mod/mod_fcgid.html
-    			<IfModule mod_fcgid.c>
-    				<tmpl_if name='fastcgi_config_syntax' op='==' value='2'>
-    					FcgidIdleTimeout 300
-    					FcgidProcessLifeTime 3600
-    					# FcgidMaxProcesses 1000
-    					FcgidMinProcessesPerClass 0
-    					FcgidMaxProcessesPerClass 10
-    					FcgidConnectTimeout 3
-    					FcgidIOTimeout 600
-    					FcgidBusyTimeout 3600
-    					FcgidMaxRequestLen 1073741824
-    				<tmpl_else>
-    					IdleTimeout 300
-    					ProcessLifeTime 3600
-    					# MaxProcessCount 1000
-    					DefaultMinClassProcessCount 0
-    					DefaultMaxClassProcessCount 100
-    					IPCConnectTimeout 3
-    					IPCCommTimeout 360
-    					BusyTimeout 3600
-    				</tmpl_if>
-    			</IfModule>
+            # FastCGI
+            <tmpl_if name='php' op='==' value='fast-cgi'>
+                # php as fast-cgi enabled
+                # For config options see: http://httpd.apache.org/mod_fcgid/mod/mod_fcgid.html
+                <IfModule mod_fcgid.c>
+                    <tmpl_if name='fastcgi_config_syntax' op='==' value='2'>
+                        FcgidIdleTimeout 300
+                        FcgidProcessLifeTime 3600
+                        # FcgidMaxProcesses 1000
+                        FcgidMaxRequestsPerProcess <tmpl_var name='fastcgi_max_requests'>
+                        FcgidMinProcessesPerClass 0
+                        FcgidMaxProcessesPerClass 10
+                        FcgidConnectTimeout 3
+                        FcgidIOTimeout 600
+                        FcgidBusyTimeout 3600
+                        FcgidMaxRequestLen 1073741824
+                    <tmpl_else>
+                        IdleTimeout 300
+                        ProcessLifeTime 3600
+                        # MaxProcessCount 1000
+                        DefaultMinClassProcessCount 0
+                        DefaultMaxClassProcessCount 100
+                        IPCConnectTimeout 3
+                        IPCCommTimeout 360
+                        BusyTimeout 3600
+                    </tmpl_if>
+                </IfModule>
 
-    			<Directory {tmpl_var name='web_document_root_www'}>
-    				<FilesMatch "\.php[345]?$">
+                <Directory {tmpl_var name='web_document_root_www'}>
+                    <FilesMatch "\.php[345]?$">
                         SetHandler fcgid-script
                     </FilesMatch>
-    				FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php
+                    FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php
                     FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php3
                     FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php4
                     FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php5
-    				Options +ExecCGI
-    				AllowOverride <tmpl_var name='allow_override'>
-    				<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                    Options +ExecCGI
+                    AllowOverride <tmpl_var name='allow_override'>
+                    <tmpl_if name='apache_version' op='>' value='2.2' format='version'>
                         Require all granted
                     <tmpl_else>
                         Order allow,deny
                         Allow from all
                     </tmpl_if>
-    			</Directory>
+                </Directory>
 
-    			<Directory {tmpl_var name='web_document_root'}>
-    				<FilesMatch "\.php[345]?$">
+                <Directory {tmpl_var name='web_document_root'}>
+                    <FilesMatch "\.php[345]?$">
                         SetHandler fcgid-script
                     </FilesMatch>
-    				FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php
+                    FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php
                     FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php3
                     FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php4
                     FCGIWrapper <tmpl_var name='fastcgi_starter_path'><tmpl_var name='fastcgi_starter_script'> .php5
-    				Options +ExecCGI
-    				AllowOverride <tmpl_var name='allow_override'>
-    				<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+                    Options +ExecCGI
+                    AllowOverride <tmpl_var name='allow_override'>
+                    <tmpl_if name='apache_version' op='>' value='2.2' format='version'>
                         Require all granted
                     <tmpl_else>
                         Order allow,deny
                         Allow from all
                     </tmpl_if>
-    			</Directory>
-    		</tmpl_if>
+                </Directory>
+            </tmpl_if>
 
-    		<tmpl_if name='php' op='==' value='php-fpm'>
-    			<IfModule mod_fastcgi.c>
-    				<Directory {tmpl_var name='document_root'}/cgi-bin>
-    					<tmpl_if name='apache_version' op='>' value='2.2' format='version'>
+            # PHP-FPM
+            <tmpl_if name='php' op='==' value='php-fpm'>
+                <IfModule mod_fastcgi.c>
+                    <Directory {tmpl_var name='document_root'}/cgi-bin>
+                        <tmpl_if name='apache_version' op='>' value='2.2' format='version'>
                             Require all granted
                         <tmpl_else>
                             Order allow,deny
                             Allow from all
                         </tmpl_if>
-    			    </Directory>
+                    </Directory>
                     <Directory {tmpl_var name='web_document_root_www'}>
                         <FilesMatch "\.php[345]?$">
                             SetHandler php5-fcgi
@@ -352,62 +382,44 @@
                         </FilesMatch>
                     </Directory>
                     Action php5-fcgi /php5-fcgi
-    				Alias /php5-fcgi {tmpl_var name='document_root'}/cgi-bin/php5-fcgi-{tmpl_var name='ip_address'}-{tmpl_var name='port'}-{tmpl_var name='domain'}
-    				<tmpl_if name='use_tcp'>
-                    	FastCgiExternalServer {tmpl_var name='document_root'}/cgi-bin/php5-fcgi-{tmpl_var name='ip_address'}-{tmpl_var name='port'}-{tmpl_var name='domain'} -idle-timeout 300 -host 127.0.0.1:<tmpl_var name='fpm_port'> -pass-header Authorization
-    				</tmpl_if>
-    				<tmpl_if name='use_socket'>
-                    	FastCgiExternalServer {tmpl_var name='document_root'}/cgi-bin/php5-fcgi-{tmpl_var name='ip_address'}-{tmpl_var name='port'}-{tmpl_var name='domain'} -idle-timeout 300 -socket <tmpl_var name='fpm_socket'> -pass-header Authorization
-    				</tmpl_if>
-    			</IfModule>
-    		</tmpl_if>
+                    Alias /php5-fcgi {tmpl_var name='document_root'}/cgi-bin/php5-fcgi-{tmpl_var name='ip_address'}-{tmpl_var name='port'}-{tmpl_var name='domain'}
+                    <tmpl_if name='use_tcp'>
+                        FastCgiExternalServer {tmpl_var name='document_root'}/cgi-bin/php5-fcgi-{tmpl_var name='ip_address'}-{tmpl_var name='port'}-{tmpl_var name='domain'} -idle-timeout 300 -host 127.0.0.1:<tmpl_var name='fpm_port'> -pass-header Authorization
+                    </tmpl_if>
+                    <tmpl_if name='use_socket'>
+                        FastCgiExternalServer {tmpl_var name='document_root'}/cgi-bin/php5-fcgi-{tmpl_var name='ip_address'}-{tmpl_var name='port'}-{tmpl_var name='domain'} -idle-timeout 300 -socket <tmpl_var name='fpm_socket'> -pass-header Authorization
+                    </tmpl_if>
+                </IfModule>
+                <IfModule mod_proxy_fcgi.c>
+                    ProxyPassMatch ^/(.*\.php[345]?(/.*)?)$ fcgi://127.0.0.1:<tmpl_var name='fpm_port'><tmpl_var name='web_document_root'>/$1
+                </IfModule>
+            </tmpl_if>
 
-    		<tmpl_if name="rewrite_enabled">
-    			RewriteEngine on
-    			<tmpl_if name='seo_redirect_enabled'>
-    				RewriteCond %{HTTP_HOST} <tmpl_var name='seo_redirect_operator'>^<tmpl_var name='seo_redirect_origin_domain'>$ [NC]
-    				RewriteRule ^(.*)$ http<tmpl_if name='ssl_enabled'>s</tmpl_if>://<tmpl_var name='seo_redirect_target_domain'>$1 [R=301,L]
-    			</tmpl_if>
-    			<tmpl_loop name="alias_seo_redirects">
-    				RewriteCond %{HTTP_HOST} <tmpl_var name='alias_seo_redirect_operator'>^<tmpl_var name='alias_seo_redirect_origin_domain'>$ [NC]
-    				RewriteRule ^(.*)$ http<tmpl_if name='ssl_enabled'>s</tmpl_if>://<tmpl_var name='alias_seo_redirect_target_domain'>$1 [R=301,L]
-    			</tmpl_loop>
-    			<tmpl_loop name="redirects">
-    				RewriteCond %{HTTP_HOST}   <tmpl_var name='rewrite_domain'>$ [NC]
-    				<tmpl_if name="rewrite_is_url" op="==" value="n">
-    					RewriteCond %{REQUEST_URI} !^/webdav/
-                        RewriteCond %{REQUEST_URI} !^/php5-fcgi/
-    					RewriteCond %{REQUEST_URI} !^<tmpl_var name='rewrite_target'>
-    				</tmpl_if>
-    				RewriteRule   ^/(.*)$ <tmpl_var name='rewrite_target'><tmpl_if name="rewrite_add_path" op="==" value="y">$1</tmpl_if>  <tmpl_var name='rewrite_type'>
-    			</tmpl_loop>
-    		</tmpl_if>
+            # add support for apache mpm_itk
+            <IfModule mpm_itk_module>
+                AssignUserId <tmpl_var name='system_user'> <tmpl_var name='system_group'>
+            </IfModule>
 
-    		# add support for apache mpm_itk
-    		<IfModule mpm_itk_module>
-    			AssignUserId <tmpl_var name='system_user'> <tmpl_var name='system_group'>
-    		</IfModule>
+            <IfModule mod_dav_fs.c>
+                # Do not execute PHP files in webdav directory
+                <Directory {tmpl_var name='document_root'}/webdav>
+                    <ifModule mod_security2.c>
+                        SecRuleRemoveById 960015
+                        SecRuleRemoveById 960032
+                    </ifModule>
+                    <FilesMatch "\.ph(p3?|tml)$">
+                        SetHandler None
+                    </FilesMatch>
+                </Directory>
 
-    		<IfModule mod_dav_fs.c>
-    			# Do not execute PHP files in webdav directory
-    			<Directory {tmpl_var name='document_root'}/webdav>
-    				<ifModule mod_security2.c>
-    					SecRuleRemoveById 960015
-    					SecRuleRemoveById 960032
-    				</ifModule>
-    				<FilesMatch "\.ph(p3?|tml)$">
-    					SetHandler None
-    				</FilesMatch>
-    			</Directory>
+                DavLockDB {tmpl_var name='document_root'}/tmp/DavLock
+                # DO NOT REMOVE THE COMMENTS!
+                # IF YOU REMOVE THEM, WEBDAV WILL NOT WORK ANYMORE!
+                # WEBDAV BEGIN
+                # WEBDAV END
+            </IfModule>
 
-    			DavLockDB {tmpl_var name='document_root'}/tmp/DavLock
-    			# DO NOT REMOVE THE COMMENTS!
-    			# IF YOU REMOVE THEM, WEBDAV WILL NOT WORK ANYMORE!
-    			# WEBDAV BEGIN
-    			# WEBDAV END
-    		</IfModule>
-
-    		<tmpl_var name='apache_directives'>
-    	</VirtualHost>
+            <tmpl_var name='apache_directives'>
+        </VirtualHost>
     </tmpl_if>
 </tmpl_loop>
